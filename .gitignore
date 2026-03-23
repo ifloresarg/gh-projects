@@ -13,6 +13,8 @@
 
 # Dependency directories
 vendor/
+dist/
+
 
 # macOS
 .DS_Store
