@@ -27,10 +27,8 @@ builds:
 
 archives:
   - id: default
-    format_overrides:
-      - goos: windows
-        formats: [zip]
-    name_template: "gh-projects_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: binary
+    name_template: "gh-projects-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
