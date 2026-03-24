@@ -10,6 +10,7 @@ import (
 type Config struct {
 	DefaultOwner    string `yaml:"default_owner"`
 	DefaultProject  int    `yaml:"default_project"`
+	DefaultView     string `yaml:"default_view"`
 	CacheTTL        int    `yaml:"cache_ttl"`
 	ShowLabels      bool   `yaml:"show_labels"`
 	ShowClosedItems bool   `yaml:"show_closed_items"`
@@ -24,6 +25,7 @@ func DefaultConfig() Config {
 	return Config{
 		DefaultOwner:    "",
 		DefaultProject:  0,
+		DefaultView:     "",
 		CacheTTL:        300,
 		ShowLabels:      true,
 		ShowClosedItems: false,

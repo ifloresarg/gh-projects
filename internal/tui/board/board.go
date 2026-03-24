@@ -2,6 +2,7 @@ package board
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -60,6 +61,7 @@ type Model struct {
 	err              error
 	width            int
 	height           int
+	config           config.Config
 	showSettings     bool
 	settingsModel    components.SettingsModel
 	showLabels       bool
@@ -86,6 +88,7 @@ func New(client github.GitHubClient, project github.Project) Model {
 		searchInput:     si,
 		spinner:         s,
 		loading:         true,
+		config:          cfg,
 		showLabels:      cfg.ShowLabels,
 		showClosedItems: cfg.ShowClosedItems,
 	}
@@ -152,8 +155,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		switch msg.Field {
 		case "ShowLabels":
 			m.showLabels = msg.Value
+			m.config.ShowLabels = msg.Value
 		case "ShowClosedItems":
 			m.showClosedItems = msg.Value
+			m.config.ShowClosedItems = msg.Value
 		}
 
 		cfg, err := config.Load()
@@ -164,10 +169,47 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		cfg.ShowClosedItems = m.showClosedItems
 		if err := config.Save(cfg); err != nil {
 			m.notif, _ = components.Show(fmt.Sprintf("Save failed: %v", err), components.KindError)
+		} else {
+			m.config = cfg
 		}
 		m.applyFilter()
 		m.clampActiveCard()
 		m.clampCardScrollOffset()
+		return m, nil
+	case components.SettingsUpdateMsg:
+		cfg, err := config.Load()
+		if err != nil {
+			cfg = config.DefaultConfig()
+		}
+
+		switch msg.Field {
+		case "DefaultOwner":
+			m.config.DefaultOwner = msg.Value
+			cfg.DefaultOwner = msg.Value
+		case "DefaultProject":
+			trimmed := strings.TrimSpace(msg.Value)
+			project := 0
+			if trimmed != "" && trimmed != "0" {
+				parsed, parseErr := strconv.Atoi(trimmed)
+				if parseErr != nil {
+					m.notif, _ = components.Show(fmt.Sprintf("Save failed: %v", parseErr), components.KindError)
+					return m, nil
+				}
+				project = parsed
+			}
+			m.config.DefaultProject = project
+			cfg.DefaultProject = project
+		case "DefaultView":
+			m.config.DefaultView = msg.Value
+			cfg.DefaultView = msg.Value
+		}
+
+		if err := config.Save(cfg); err != nil {
+			m.notif, _ = components.Show(fmt.Sprintf("Save failed: %v", err), components.KindError)
+			return m, nil
+		}
+
+		m.config = cfg
 		return m, nil
 	case components.SettingsCloseMsg:
 		m.showSettings = false
@@ -313,7 +355,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, cmd
 		case "s":
 			m.showSettings = true
-			m.settingsModel = components.NewSettingsModel(m.showLabels, m.showClosedItems)
+			m.settingsModel = components.NewSettingsModel(
+				m.showLabels,
+				m.showClosedItems,
+				m.config.DefaultOwner,
+				m.config.DefaultProject,
+				m.config.DefaultView,
+			)
 			m.settingsModel.SetSize(m.width, m.height)
 			return m, nil
 		case "h", "left":

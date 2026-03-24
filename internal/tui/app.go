@@ -14,6 +14,7 @@ import (
 	"github.com/ifloresarg/gh-projects/internal/tui/detail"
 	"github.com/ifloresarg/gh-projects/internal/tui/help"
 	"github.com/ifloresarg/gh-projects/internal/tui/picker"
+	"github.com/ifloresarg/gh-projects/internal/tui/setup"
 	"github.com/ifloresarg/gh-projects/internal/tui/viewpicker"
 )
 
@@ -21,6 +22,7 @@ type ViewState int
 
 const (
 	ViewLoading ViewState = iota
+	ViewSetup
 	ViewPicker
 	ViewViewPicker
 	ViewBoard
@@ -33,6 +35,7 @@ type App struct {
 	state           ViewState
 	quitConfirm     bool
 	loadErr         string
+	setup           setup.Model
 	picker          picker.Model
 	viewpicker      viewpicker.Model
 	board           board.Model
@@ -53,15 +56,22 @@ type projectResolvedMsg struct {
 }
 
 func NewApp(cfg config.Config, client github.GitHubClient) App {
-	owner := cfg.DefaultOwner
-	return App{
+	a := App{
 		config: cfg,
 		client: client,
-		state:  ViewPicker,
-		picker: picker.New(client, owner),
 		help:   help.New(0, 0),
 		keys:   DefaultKeyMap,
 	}
+
+	if cfg.DefaultOwner == "" {
+		a.state = ViewSetup
+		a.setup = setup.New(client)
+		return a
+	}
+
+	a.state = ViewPicker
+	a.picker = picker.New(client, cfg.DefaultOwner)
+	return a
 }
 
 func (a App) WithInitialState(state ViewState) App {
@@ -77,6 +87,8 @@ func (a App) WithInitialView(name string) App {
 
 func (a App) Init() tea.Cmd {
 	switch a.state {
+	case ViewSetup:
+		return a.setup.Init()
 	case ViewPicker:
 		return a.picker.Init()
 	case ViewLoading:
@@ -114,6 +126,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.help, _ = a.help.Update(msg)
+		if a.state == ViewSetup {
+			var cmd tea.Cmd
+			a.setup, cmd = a.setup.Update(msg)
+			return a, cmd
+		}
 		if a.state == ViewPicker {
 			var cmd tea.Cmd
 			a.picker, cmd = a.picker.Update(msg)
@@ -135,6 +152,35 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, cmd
 		}
 		return a, nil
+	case setup.SetupCompleteMsg:
+		a.config.DefaultOwner = msg.Owner
+		if msg.Project != 0 {
+			a.config.DefaultProject = msg.Project
+		}
+		if msg.View != "" {
+			a.config.DefaultView = msg.View
+		}
+		a.initialViewName = msg.View
+		if err := config.Save(a.config); err != nil {
+			a.loadErr = fmt.Sprintf("config save failed: %v", err)
+		}
+
+		if msg.Project != 0 {
+			a.loadErr = ""
+			a.selectedProject = nil
+			a.state = ViewLoading
+			return a, a.Init()
+		}
+
+		a.loadErr = ""
+		a.picker = picker.New(a.client, msg.Owner)
+		a.state = ViewPicker
+		if a.width > 0 || a.height > 0 {
+			a.picker, _ = a.picker.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+		}
+		return a, a.picker.Init()
+	case setup.SetupCancelMsg:
+		return a, tea.Quit
 	case projectResolvedMsg:
 		if msg.err != nil {
 			a.loadErr = fmt.Sprintf("Error loading project: %v", msg.err)
@@ -254,6 +300,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if a.state == ViewSetup {
+		var cmd tea.Cmd
+		a.setup, cmd = a.setup.Update(msg)
+		return a, cmd
+	}
+
 	if a.state == ViewPicker {
 		var cmd tea.Cmd
 		a.picker, cmd = a.picker.Update(msg)
@@ -324,6 +376,8 @@ func (a App) View() string {
 	var baseView string
 
 	switch a.state {
+	case ViewSetup:
+		baseView = a.setup.View()
 	case ViewPicker:
 		baseView = a.picker.View()
 	case ViewViewPicker:

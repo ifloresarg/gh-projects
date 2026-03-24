@@ -10,7 +10,45 @@ import (
 	"github.com/ifloresarg/gh-projects/internal/github"
 	"github.com/ifloresarg/gh-projects/internal/tui/detail"
 	"github.com/ifloresarg/gh-projects/internal/tui/picker"
+	"github.com/ifloresarg/gh-projects/internal/tui/setup"
 )
+
+func TestNewAppStartsInSetupWhenDefaultOwnerEmpty(t *testing.T) {
+	t.Parallel()
+
+	a := NewApp(config.Config{}, &github.MockClient{})
+	if a.state != ViewSetup {
+		t.Fatalf("state = %v, want %v", a.state, ViewSetup)
+	}
+}
+
+func TestNewAppStartsInPickerWhenDefaultOwnerPresent(t *testing.T) {
+	t.Parallel()
+
+	a := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	if a.state != ViewPicker {
+		t.Fatalf("state = %v, want %v", a.state, ViewPicker)
+	}
+}
+
+func TestAppSetupCompleteTransitionsToPicker(t *testing.T) {
+	t.Parallel()
+
+	a := NewApp(config.Config{}, &github.MockClient{})
+
+	model, cmd := a.Update(setup.SetupCompleteMsg{Owner: "org"})
+	updated := model.(App)
+
+	if updated.state != ViewPicker {
+		t.Fatalf("state = %v, want %v", updated.state, ViewPicker)
+	}
+	if updated.config.DefaultOwner != "org" {
+		t.Fatalf("config.DefaultOwner = %q, want %q", updated.config.DefaultOwner, "org")
+	}
+	if cmd == nil {
+		t.Fatal("cmd = nil, want picker init command")
+	}
+}
 
 func TestAppQuitConfirmationFlow(t *testing.T) {
 	t.Parallel()

@@ -252,3 +252,75 @@ func TestPRFetchLimitFromYAML(t *testing.T) {
 		t.Errorf("PRFetchLimit = %d, want 50", loaded.PRFetchLimit)
 	}
 }
+
+func TestDefaultViewDefault(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultConfig()
+	if cfg.DefaultView != "" {
+		t.Errorf("DefaultView = %q, want empty string", cfg.DefaultView)
+	}
+}
+
+func TestDefaultViewRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	configTestMu.Lock()
+	defer configTestMu.Unlock()
+
+	tempDir := t.TempDir()
+	tempConfigPath := filepath.Join(tempDir, "config.yaml")
+
+	origOverride := configPathOverride
+	configPathOverride = tempConfigPath
+	defer func() { configPathOverride = origOverride }()
+
+	original := Config{
+		DefaultOwner:   "test-org",
+		DefaultProject: 3,
+		DefaultView:    "board",
+		CacheTTL:       60,
+	}
+
+	err := Save(original)
+	if err != nil {
+		t.Fatalf("Save() failed: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if loaded.DefaultView != original.DefaultView {
+		t.Errorf("DefaultView = %q, want %q", loaded.DefaultView, original.DefaultView)
+	}
+}
+
+func TestDefaultViewFromYAML(t *testing.T) {
+	t.Parallel()
+
+	configTestMu.Lock()
+	defer configTestMu.Unlock()
+
+	tempDir := t.TempDir()
+	tempConfigPath := filepath.Join(tempDir, "config.yaml")
+
+	origOverride := configPathOverride
+	configPathOverride = tempConfigPath
+	defer func() { configPathOverride = origOverride }()
+
+	err := os.WriteFile(tempConfigPath, []byte("default_view: table\n"), 0o644)
+	if err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if loaded.DefaultView != "table" {
+		t.Errorf("DefaultView = %q, want \"table\"", loaded.DefaultView)
+	}
+}

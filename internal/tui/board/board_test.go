@@ -3,11 +3,15 @@ package board
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/ifloresarg/gh-projects/internal/config"
 	"github.com/ifloresarg/gh-projects/internal/github"
+	"github.com/ifloresarg/gh-projects/internal/tui/components"
 )
 
 func testBoardFields() []github.ProjectField {
@@ -692,6 +696,46 @@ func TestSettingsKeyOpensSettingsOverlay(t *testing.T) {
 	}
 }
 
+func TestSettingsUpdateMsgUpdatesOwner(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0755); err != nil {
+		t.Fatalf("MkdirAll(home): %v", err)
+	}
+	t.Setenv("HOME", home)
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: testBoardItems(), fields: testBoardFields()})
+
+	m, _ = m.Update(components.SettingsUpdateMsg{Field: "DefaultOwner", Value: "neworg"})
+
+	if m.config.DefaultOwner != "neworg" {
+		t.Fatalf("config.DefaultOwner = %q, want %q", m.config.DefaultOwner, "neworg")
+	}
+}
+
+func TestSettingsUpdateMsgUpdatesView(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0755); err != nil {
+		t.Fatalf("MkdirAll(home): %v", err)
+	}
+	t.Setenv("HOME", home)
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: testBoardItems(), fields: testBoardFields()})
+
+	m, _ = m.Update(components.SettingsUpdateMsg{Field: "DefaultView", Value: "sprint"})
+
+	if m.config.DefaultView != "sprint" {
+		t.Fatalf("config.DefaultView = %q, want %q", m.config.DefaultView, "sprint")
+	}
+}
+
 func TestClosedItemsFilteredWhenShowClosedItemsFalse(t *testing.T) {
 	t.Parallel()
 
@@ -920,5 +964,43 @@ func TestArrowKeyNavigation_ArrowsEquivalentToHJKL(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSettingsUpdateMsgPersistsConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0755); err != nil {
+		t.Fatalf("MkdirAll(home): %v", err)
+	}
+	t.Setenv("HOME", home)
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: testBoardItems(), fields: testBoardFields()})
+
+	// Fire SettingsUpdateMsg for DefaultOwner
+	m, _ = m.Update(components.SettingsUpdateMsg{Field: "DefaultOwner", Value: "persistedorg"})
+
+	// Load config from disk and verify DefaultOwner was persisted
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load(): %v", err)
+	}
+	if cfg.DefaultOwner != "persistedorg" {
+		t.Fatalf("cfg.DefaultOwner = %q, want %q", cfg.DefaultOwner, "persistedorg")
+	}
+
+	// Fire SettingsUpdateMsg for DefaultView
+	_, _ = m.Update(components.SettingsUpdateMsg{Field: "DefaultView", Value: "myview"})
+
+	// Load config again and verify DefaultView was persisted
+	cfg, err = config.Load()
+	if err != nil {
+		t.Fatalf("config.Load(): %v", err)
+	}
+	if cfg.DefaultView != "myview" {
+		t.Fatalf("cfg.DefaultView = %q, want %q", cfg.DefaultView, "myview")
 	}
 }
