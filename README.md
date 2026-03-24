@@ -29,6 +29,7 @@ gh extension install ifloresarg/gh-projects
 
 - `gh` CLI installed.
 - Proper authentication scope:
+
   ```bash
   gh auth refresh -s project
   ```
@@ -64,6 +65,7 @@ gh projects
 | `L` | Move card right |
 
 Additional actions (Issue Detail View):
+
 - `a`: Assign / Unassign users
 - `L`: Add / Remove labels
 - `x` / `X`: Close / Reopen issue
@@ -96,7 +98,6 @@ You can use `gh-projects` inside Neovim as a floating terminal.
 return {
   "ifloresarg/gh-projects",
   -- Point this to your local clone of the repo
-  dir = vim.fn.expand("~/path/to/gh-projects"),
   config = function()
     require("gh-projects").setup({
       binary = "gh projects",
