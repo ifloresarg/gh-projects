@@ -37,7 +37,8 @@ To get started with development, ensure you have Go 1.26.1 or later installed.
 - `internal/tui/`: Bubble Tea UI components and application logic.
 - `internal/github/`: GitHub API client and authentication handling.
 - `internal/config/`: Configuration management.
-- `nvim-plugin/`: Neovim integration plugin.
+- `lua/`: Neovim plugin Lua module.
+- `plugin/`: Neovim plugin auto-load script.
 
 ## Common Tasks
 

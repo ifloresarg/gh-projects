@@ -88,13 +88,15 @@ cache_ttl: 300
 
 You can use `gh-projects` inside Neovim as a floating terminal.
 
+**Note:** The Neovim plugin requires the full repository source, not just the binary installed via `gh extension install`. Clone the repo first and point `dir` to your local clone.
+
 ### lazy.nvim example
 
 ```lua
-{
+return {
   "ifloresarg/gh-projects",
-  -- Change this if your extension path is different
-  dir = vim.fn.expand("~/.local/share/gh/extensions/gh-projects"),
+  -- Point this to your local clone of the repo
+  dir = vim.fn.expand("~/path/to/gh-projects"),
   config = function()
     require("gh-projects").setup({
       binary = "gh projects",
