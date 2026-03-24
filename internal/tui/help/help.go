@@ -72,6 +72,7 @@ func (m Model) View() string {
 				"  g / G     First / last card",
 				"  < / >     Move card left / right",
 				"  /         Search / filter",
+				"  s         Settings",
 			},
 		},
 		{

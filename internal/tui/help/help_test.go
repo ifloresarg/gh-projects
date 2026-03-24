@@ -49,3 +49,15 @@ func TestHelpUpdateDismissesOnKeyAndResizes(t *testing.T) {
 		t.Fatal("key update did not dismiss help overlay")
 	}
 }
+
+func TestHelpViewContainsSettingsKeybinding(t *testing.T) {
+	t.Parallel()
+
+	m := New(80, 24)
+	m.Show()
+
+	view := m.View()
+	if !strings.Contains(view, "Settings") {
+		t.Errorf("expected help view to contain 'Settings', got:\n%s", view)
+	}
+}

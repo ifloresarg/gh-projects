@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/ifloresarg/gh-projects/internal/tui/detail"
 	"github.com/ifloresarg/gh-projects/internal/tui/picker"
 	"github.com/ifloresarg/gh-projects/internal/tui/setup"
+	"github.com/ifloresarg/gh-projects/internal/tui/viewpicker"
 )
 
 func TestNewAppStartsInSetupWhenDefaultOwnerEmpty(t *testing.T) {
@@ -172,6 +174,72 @@ func TestAppProjectSelectionTransitionsToViewPicker(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("expected viewpicker init command after project selection")
+	}
+}
+
+func TestProjectSelectedMsgSavesOwnerAndProjectToConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
+	_, _ = app.Update(picker.ProjectSelectedMsg{Project: github.Project{ID: "test-id", Title: "Test", Number: 42, Owner: "testorg"}})
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load(): %v", err)
+	}
+	if cfg.DefaultOwner != "testorg" {
+		t.Fatalf("cfg.DefaultOwner = %q, want %q", cfg.DefaultOwner, "testorg")
+	}
+	if cfg.DefaultProject != 42 {
+		t.Fatalf("cfg.DefaultProject = %d, want %d", cfg.DefaultProject, 42)
+	}
+}
+
+func TestViewSelectedMsgSavesViewToConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
+	app.selectedProject = &github.Project{ID: "test-id", Title: "Test", Number: 42, Owner: "testorg"}
+
+	_, _ = app.Update(viewpicker.ViewSelectedMsg{View: github.ProjectView{ID: "v1", Name: "sprint", Layout: "BOARD_LAYOUT"}})
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load(): %v", err)
+	}
+	if cfg.DefaultView != "sprint" {
+		t.Fatalf("cfg.DefaultView = %q, want %q", cfg.DefaultView, "sprint")
+	}
+}
+
+func TestAutoSavePreservesExistingConfigFields(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+
+	if err := config.Save(config.Config{CacheTTL: 600}); err != nil {
+		t.Fatalf("config.Save(): %v", err)
+	}
+
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
+	_, _ = app.Update(picker.ProjectSelectedMsg{Project: github.Project{ID: "test-id", Title: "Test", Number: 42, Owner: "testorg"}})
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load(): %v", err)
+	}
+	if cfg.CacheTTL != 600 {
+		t.Fatalf("cfg.CacheTTL = %d, want %d", cfg.CacheTTL, 600)
+	}
+	if cfg.DefaultOwner != "testorg" {
+		t.Fatalf("cfg.DefaultOwner = %q, want %q", cfg.DefaultOwner, "testorg")
 	}
 }
 

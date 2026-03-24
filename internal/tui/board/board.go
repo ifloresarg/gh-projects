@@ -658,7 +658,7 @@ func (m Model) renderFooterHints() string {
 		Background(lipgloss.Color("236")).
 		Foreground(lipgloss.Color("8"))
 
-	hints := "? Help  Enter Detail  < > Move  / Search  v Views  q Quit"
+	hints := "? Help  Enter Detail  < > Move  / Search  s Settings  v Views  q Quit"
 	maxVisible := max(m.width/(columnWidth+2), 1)
 	scrollHints := make([]string, 0, 2)
 	if m.scrollOffset > 0 {

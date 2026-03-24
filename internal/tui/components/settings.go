@@ -157,7 +157,8 @@ func (m SettingsModel) PopupView() string {
 		}
 
 		value := item.value
-		if m.editingField == fieldName(i) {
+		field := fieldName(i)
+		if field != "" && m.editingField == field {
 			value = m.editInput.View()
 		}
 

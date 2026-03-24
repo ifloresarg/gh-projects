@@ -235,6 +235,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case picker.ProjectSelectedMsg:
 		a.loadErr = ""
 		a.selectedProject = &msg.Project
+		if cfg, err := config.Load(); err == nil {
+			cfg.DefaultOwner = msg.Project.Owner
+			cfg.DefaultProject = msg.Project.Number
+			_ = config.Save(cfg)
+		}
 		a.viewpicker = viewpicker.New(a.client, msg.Project.ID, msg.Project.Title)
 		a.state = ViewViewPicker
 		if a.width > 0 || a.height > 0 {
@@ -246,6 +251,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		a.loadErr = ""
+		if cfg, err := config.Load(); err == nil {
+			cfg.DefaultView = msg.View.Name
+			_ = config.Save(cfg)
+		}
 		a.board = board.New(a.client, *a.selectedProject)
 		a.board.SetActiveView(&msg.View)
 		a.state = ViewBoard

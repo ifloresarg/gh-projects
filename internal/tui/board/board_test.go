@@ -736,6 +736,80 @@ func TestSettingsUpdateMsgUpdatesView(t *testing.T) {
 	}
 }
 
+func TestSettingsToggleShowLabelsUpdatesCheckboxInView(t *testing.T) {
+	t.Parallel()
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m.showLabels = true
+	m.config.ShowLabels = true
+	m.LoadItemsForTest(testBoardItems(), testBoardFields())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		m, _ = m.Update(cmd())
+	}
+
+	if got := m.settingsModel.View(); !strings.Contains(got, "[ ]") {
+		t.Fatalf("settingsModel.View() = %q, want unchecked checkbox", got)
+	}
+
+	if m.showLabels {
+		t.Fatalf("showLabels = %t, want false", m.showLabels)
+	}
+}
+
+func TestSettingsToggleShowClosedUpdatesCheckboxInView(t *testing.T) {
+	t.Parallel()
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m.showClosedItems = false
+	m.config.ShowClosedItems = false
+	m.LoadItemsForTest(testBoardItems(), testBoardFields())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		m, _ = m.Update(cmd())
+	}
+
+	if got := m.settingsModel.View(); !strings.Contains(got, "[✓]") {
+		t.Fatalf("settingsModel.View() = %q, want checked checkbox", got)
+	}
+
+	if !m.showClosedItems {
+		t.Fatalf("showClosedItems = %t, want true", m.showClosedItems)
+	}
+}
+
+func TestSettingsToggleRoundTripPreservesState(t *testing.T) {
+	t.Parallel()
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m.showLabels = true
+	m.config.ShowLabels = true
+	m.LoadItemsForTest(testBoardItems(), testBoardFields())
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		m, _ = m.Update(cmd())
+	}
+	m, _ = m.Update(components.SettingsToggleMsg{Field: "ShowLabels", Value: false})
+
+	if m.showLabels {
+		t.Fatalf("showLabels = %t, want false", m.showLabels)
+	}
+
+	if got := m.settingsModel.View(); !strings.Contains(got, "[ ]") {
+		t.Fatalf("settingsModel.View() = %q, want unchecked checkbox", got)
+	}
+}
+
 func TestClosedItemsFilteredWhenShowClosedItemsFalse(t *testing.T) {
 	t.Parallel()
 
@@ -1002,5 +1076,18 @@ func TestSettingsUpdateMsgPersistsConfig(t *testing.T) {
 	}
 	if cfg.DefaultView != "myview" {
 		t.Fatalf("cfg.DefaultView = %q, want %q", cfg.DefaultView, "myview")
+	}
+}
+
+func TestBoardFooterContainsSettingsHint(t *testing.T) {
+	t.Parallel()
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = m.Update(boardLoadedMsg{items: testBoardItems(), fields: testBoardFields()})
+
+	view := m.View()
+	if !strings.Contains(view, "s Settings") {
+		t.Errorf("expected footer to contain 's Settings', got:\n%s", view)
 	}
 }
