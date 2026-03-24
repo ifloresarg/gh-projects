@@ -12,12 +12,12 @@ import (
 func TestPickerViewShowsProjectsAfterLoad(t *testing.T) {
 	t.Parallel()
 
-	m := New(&github.MockClient{}, "ifloresarg")
+	m := New(&github.MockClient{}, "octocat")
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m, _ = m.Update(projectsLoadedMsg{projects: []github.Project{{ID: "p1", Number: 1, Title: "Platform Roadmap", ItemCount: 12}}})
 
 	view := m.View()
-	for _, fragment := range []string{"GitHub Projects · ifloresarg", "#1 Platform Roadmap", "12 items"} {
+	for _, fragment := range []string{"GitHub Projects · octocat", "#1 Platform Roadmap", "12 items"} {
 		if !strings.Contains(view, fragment) {
 			t.Fatalf("View() missing %q in %q", fragment, view)
 		}
@@ -27,7 +27,7 @@ func TestPickerViewShowsProjectsAfterLoad(t *testing.T) {
 func TestPickerEnterReturnsSelectedProjectMsg(t *testing.T) {
 	t.Parallel()
 
-	m := New(&github.MockClient{}, "ifloresarg")
+	m := New(&github.MockClient{}, "octocat")
 	m, _ = m.Update(projectsLoadedMsg{projects: []github.Project{{ID: "p1", Number: 3, Title: "Engineering Backlog", ItemCount: 27}}})
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -47,7 +47,7 @@ func TestPickerEnterReturnsSelectedProjectMsg(t *testing.T) {
 func TestPickerViewShowsErrorState(t *testing.T) {
 	t.Parallel()
 
-	m := New(&github.MockClient{}, "ifloresarg")
+	m := New(&github.MockClient{}, "octocat")
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
 	m, _ = m.Update(projectsLoadedMsg{err: errors.New("network error")})
 

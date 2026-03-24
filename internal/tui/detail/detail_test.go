@@ -18,10 +18,10 @@ func testIssueItem() github.ProjectItem {
 		Body:      "Adds markdown body support.",
 		State:     "OPEN",
 		Author:    github.User{Login: "octocat"},
-		Assignees: []github.User{{Login: "ifloresarg"}},
+		Assignees: []github.User{{Login: "octocat"}},
 		Labels:    []github.Label{{ID: "bug", Name: "bug", Color: "d73a4a"}},
 		CreatedAt: time.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC),
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}
 
@@ -42,10 +42,10 @@ func TestDetailViewRendersIssueContent(t *testing.T) {
 	m := New(&github.MockClient{}, testIssueItem(), "PVT_1", nil, 0, 0)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m, _ = m.Update(issueLoadedMsg{issue: testIssueItem().Content.(*github.Issue)})
-	m, _ = m.Update(linkedPRsLoadedMsg{prs: []github.PullRequest{{Number: 56, Title: "Fix keyboard navigation", State: "OPEN", Author: github.User{Login: "ifloresarg"}}}})
+	m, _ = m.Update(linkedPRsLoadedMsg{prs: []github.PullRequest{{Number: 56, Title: "Fix keyboard navigation", State: "OPEN", Author: github.User{Login: "octocat"}}}})
 
 	view := m.View()
-	for _, fragment := range []string{"Issue #101 [OPEN]", "Implement GraphQL client", "Assignees: ifloresarg", "Labels: ● bug", "Linked Pull Requests", "#56"} {
+	for _, fragment := range []string{"Issue #101 [OPEN]", "Implement GraphQL client", "Assignees: octocat", "Labels: ● bug", "Linked Pull Requests", "#56"} {
 		if !strings.Contains(view, fragment) {
 			t.Fatalf("View() missing %q in %q", fragment, view)
 		}
@@ -64,7 +64,7 @@ func TestDetailViewForPullRequestShowsReadonlyContent(t *testing.T) {
 			Title:  "Refine board rendering",
 			State:  "MERGED",
 			Author: github.User{Login: "hubot"},
-			URL:    "https://github.com/ifloresarg/gh-projects/pull/55",
+			URL:    "https://github.com/octocat/gh-projects/pull/55",
 		},
 	}
 
@@ -103,10 +103,10 @@ func TestParsePRRefTableDriven(t *testing.T) {
 		wantNumber int
 		wantErr    bool
 	}{
-		{name: "owner repo ref", input: "ifloresarg/gh-projects#12", wantOwner: "ifloresarg", wantRepo: "gh-projects", wantNumber: 12},
-		{name: "github url", input: "https://github.com/ifloresarg/gh-projects/pull/34", wantOwner: "ifloresarg", wantRepo: "gh-projects", wantNumber: 34},
-		{name: "invalid ref", input: "ifloresarg/gh-projects", wantErr: true},
-		{name: "invalid number", input: "ifloresarg/gh-projects#abc", wantErr: true},
+		{name: "owner repo ref", input: "octocat/gh-projects#12", wantOwner: "octocat", wantRepo: "gh-projects", wantNumber: 12},
+		{name: "github url", input: "https://github.com/octocat/gh-projects/pull/34", wantOwner: "octocat", wantRepo: "gh-projects", wantNumber: 34},
+		{name: "invalid ref", input: "octocat/gh-projects", wantErr: true},
+		{name: "invalid number", input: "octocat/gh-projects#abc", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -137,7 +137,7 @@ func TestAddPRToProjectCmdReturnsLookupError(t *testing.T) {
 		GetPullRequestNodeIDFn: func(owner, repo string, number int) (string, error) {
 			return "", wantErr
 		},
-	}, "PVT_1", "ifloresarg", "gh-projects", 77)
+	}, "PVT_1", "octocat", "gh-projects", 77)
 
 	msg := cmd()
 	result, ok := msg.(addPRResultMsg)
@@ -180,7 +180,7 @@ func TestDetailPRSelectedMsgTriggersAddPR(t *testing.T) {
 	m, cmd := m.Update(prSelectedMsg{pr: github.PullRequest{
 		Number:    42,
 		Title:     "Fix bug",
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}})
 

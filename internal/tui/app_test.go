@@ -25,7 +25,7 @@ func TestNewAppStartsInSetupWhenDefaultOwnerEmpty(t *testing.T) {
 func TestNewAppStartsInPickerWhenDefaultOwnerPresent(t *testing.T) {
 	t.Parallel()
 
-	a := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	a := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	if a.state != ViewPicker {
 		t.Fatalf("state = %v, want %v", a.state, ViewPicker)
 	}
@@ -62,7 +62,7 @@ func TestAppQuitConfirmationFlow(t *testing.T) {
 	}{
 		{
 			name:            "q sets confirmation without quitting",
-			app:             NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{}),
+			app:             NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{}),
 			msg:             tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}},
 			wantQuitConfirm: true,
 		},
@@ -81,7 +81,7 @@ func TestAppQuitConfirmationFlow(t *testing.T) {
 		},
 		{
 			name:            "ctrl+c quits immediately",
-			app:             NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{}),
+			app:             NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{}),
 			msg:             tea.KeyMsg{Type: tea.KeyCtrlC},
 			wantQuitConfirm: false,
 			wantQuit:        true,
@@ -116,7 +116,7 @@ func TestAppQuitConfirmationFlow(t *testing.T) {
 func TestAppViewShowsQuitConfirmationOverlay(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app.quitConfirm = true
 
 	view := app.View()
@@ -128,7 +128,7 @@ func TestAppViewShowsQuitConfirmationOverlay(t *testing.T) {
 func TestAppQuitConfirmationSwallowsOtherKeys(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app.quitConfirm = true
 	app.help.Hide()
 
@@ -160,8 +160,8 @@ func isQuitCmd(cmd tea.Cmd) bool {
 func TestAppProjectSelectionTransitionsToViewPicker(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
-	model, cmd := app.Update(picker.ProjectSelectedMsg{Project: github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "ifloresarg"}})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
+	model, cmd := app.Update(picker.ProjectSelectedMsg{Project: github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "octocat"}})
 	updated := model.(App)
 
 	if updated.state != ViewViewPicker {
@@ -178,7 +178,7 @@ func TestAppProjectSelectionTransitionsToViewPicker(t *testing.T) {
 func TestAppHelpOverlayTakesPrecedenceInView(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app.help.Show()
 
 	view := app.View()
@@ -196,12 +196,12 @@ func TestAppHelpOverlayTakesPrecedenceInView(t *testing.T) {
 func TestDetailTransitionReceivesDimensions(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 
 	model, _ := app.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	app = model.(App)
 
-	app.selectedProject = &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "ifloresarg"}
+	app.selectedProject = &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "octocat"}
 	app.state = ViewBoard
 
 	testItem := github.ProjectItem{
@@ -209,7 +209,7 @@ func TestDetailTransitionReceivesDimensions(t *testing.T) {
 		Title:         "Implement GraphQL client",
 		Type:          "Issue",
 		StatusID:      "status_todo",
-		RepoOwner:     "ifloresarg",
+		RepoOwner:     "octocat",
 		RepoName:      "gh-projects",
 		ContentNumber: 101,
 		Content: &github.Issue{
@@ -219,7 +219,7 @@ func TestDetailTransitionReceivesDimensions(t *testing.T) {
 			Body:      "Build the core GitHub GraphQL client for Projects v2.",
 			State:     "OPEN",
 			Author:    github.User{Login: "octocat"},
-			RepoOwner: "ifloresarg",
+			RepoOwner: "octocat",
 			RepoName:  "gh-projects",
 		},
 	}
@@ -262,7 +262,7 @@ func TestAppInitReturnsCommandForViewLoading(t *testing.T) {
 		},
 	}
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg", DefaultProject: 1}, mockClient)
+	app := NewApp(config.Config{DefaultOwner: "octocat", DefaultProject: 1}, mockClient)
 	app = app.WithInitialState(ViewLoading)
 
 	cmd := app.Init()
@@ -275,11 +275,11 @@ func TestAppInitReturnsCommandForViewLoading(t *testing.T) {
 func TestAppProjectResolvedNoViewTransitionsToViewPicker(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app = app.WithInitialState(ViewLoading)
 	app = app.WithInitialView("")
 
-	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "ifloresarg"}
+	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "octocat"}
 	views := []github.ProjectView{
 		{ID: "view-1", Name: "Kanban", Layout: "BOARD_LAYOUT", Number: 1},
 	}
@@ -313,11 +313,11 @@ func TestAppProjectResolvedNoViewTransitionsToViewPicker(t *testing.T) {
 func TestAppProjectResolvedWithMatchingViewTransitionsToBoard(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app = app.WithInitialState(ViewLoading)
 	app = app.WithInitialView("Kanban")
 
-	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "ifloresarg"}
+	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "octocat"}
 	views := []github.ProjectView{
 		{ID: "view-1", Name: "Kanban", Layout: "BOARD_LAYOUT", Number: 1},
 		{ID: "view-2", Name: "Table", Layout: "TABLE_LAYOUT", Number: 2},
@@ -352,11 +352,11 @@ func TestAppProjectResolvedWithMatchingViewTransitionsToBoard(t *testing.T) {
 func TestAppProjectResolvedWithNonMatchingViewSetsError(t *testing.T) {
 	t.Parallel()
 
-	app := NewApp(config.Config{DefaultOwner: "ifloresarg"}, &github.MockClient{})
+	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
 	app = app.WithInitialState(ViewLoading)
 	app = app.WithInitialView("NonExistent")
 
-	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "ifloresarg"}
+	project := &github.Project{ID: "PVT_1", Title: "Roadmap", Number: 1, Owner: "octocat"}
 	views := []github.ProjectView{
 		{ID: "view-1", Name: "Kanban", Layout: "BOARD_LAYOUT", Number: 1},
 	}

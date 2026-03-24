@@ -52,7 +52,7 @@ func TestListRepositoryPullRequestsHonorsLimit(t *testing.T) {
 	}
 
 	client := &GraphQLClient{client: apiClient}
-	prs, err := client.ListRepositoryPullRequests("ifloresarg", "gh-projects", 25)
+	prs, err := client.ListRepositoryPullRequests("octocat", "gh-projects", 25)
 	if err != nil {
 		t.Fatalf("ListRepositoryPullRequests() error = %v", err)
 	}
@@ -90,7 +90,7 @@ func buildPullRequestsPageResponse(page int, hasNext bool) string {
 				"login": "octocat",
 				"name":  "The Octocat",
 			},
-			"url": fmt.Sprintf("https://github.com/ifloresarg/gh-projects/pull/%d", number),
+			"url": fmt.Sprintf("https://github.com/octocat/gh-projects/pull/%d", number),
 		})
 	}
 
@@ -98,7 +98,7 @@ func buildPullRequestsPageResponse(page int, hasNext bool) string {
 		"data": map[string]any{
 			"repository": map[string]any{
 				"owner": map[string]any{
-					"login": "ifloresarg",
+					"login": "octocat",
 				},
 				"name": "gh-projects",
 				"pullRequests": map[string]any{

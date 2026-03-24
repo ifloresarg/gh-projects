@@ -17,12 +17,12 @@ func TestCardViewForIssueIncludesMetadata(t *testing.T) {
 		ContentNumber: 101,
 		Content: &github.Issue{
 			Number:    101,
-			Assignees: []github.User{{Login: "ifloresarg"}, {Login: "mona"}},
+			Assignees: []github.User{{Login: "octocat"}, {Login: "mona"}},
 			Labels:    []github.Label{{Name: "bug", Color: "d73a4a"}},
 		},
 	}, true, 32, true)
 
-	for _, fragment := range []string{"#101 - Implement", "GraphQL", "@ifloresarg", "@mona", "bug"} {
+	for _, fragment := range []string{"#101 - Implement", "GraphQL", "@octocat", "@mona", "bug"} {
 		if !strings.Contains(view, fragment) {
 			t.Fatalf("Card() view missing %q in %q", fragment, view)
 		}

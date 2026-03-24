@@ -8,7 +8,7 @@ func TestProjectItemIssueContentAccess(t *testing.T) {
 	item := ProjectItem{
 		Title:   "Fallback",
 		Status:  "Todo",
-		Content: &Issue{Number: 42, Title: "Actual issue", RepoOwner: "ifloresarg", RepoName: "gh-projects"},
+		Content: &Issue{Number: 42, Title: "Actual issue", RepoOwner: "octocat", RepoName: "gh-projects"},
 	}
 
 	issue, ok := item.Content.(*Issue)
@@ -32,7 +32,7 @@ func TestProjectItemPullRequestContentAccess(t *testing.T) {
 			Number:    55,
 			Title:     "Refine board rendering",
 			State:     "MERGED",
-			RepoOwner: "ifloresarg",
+			RepoOwner: "octocat",
 			RepoName:  "gh-projects",
 		},
 	}
@@ -44,7 +44,7 @@ func TestProjectItemPullRequestContentAccess(t *testing.T) {
 	if pr.Number != item.ContentNumber {
 		t.Fatalf("pull request number = %d, want %d", pr.Number, item.ContentNumber)
 	}
-	if pr.RepoOwner != "ifloresarg" || pr.RepoName != "gh-projects" {
+	if pr.RepoOwner != "octocat" || pr.RepoName != "gh-projects" {
 		t.Fatalf("unexpected pull request repo fields = %#v", pr)
 	}
 }

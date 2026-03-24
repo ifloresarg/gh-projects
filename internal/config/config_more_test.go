@@ -25,11 +25,11 @@ func TestLoadTableDrivenScenarios(t *testing.T) {
 		},
 		{
 			name: "partial yaml keeps defaults",
-			contents: `default_owner: ifloresarg
+			contents: `default_owner: octocat
 cache_ttl: 90
 `,
 			writeFile:    true,
-			wantOwner:    "ifloresarg",
+			wantOwner:    "octocat",
 			wantProject:  0,
 			wantCacheTTL: 90,
 		},
@@ -99,7 +99,7 @@ func TestSaveCreatesNestedConfigDirectory(t *testing.T) {
 	configPathOverride = path
 	defer func() { configPathOverride = origOverride }()
 
-	if err := Save(Config{DefaultOwner: "ifloresarg", DefaultProject: 7, CacheTTL: 45}); err != nil {
+	if err := Save(Config{DefaultOwner: "octocat", DefaultProject: 7, CacheTTL: 45}); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 

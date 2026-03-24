@@ -40,13 +40,13 @@ func newLinkPRTestClient(t *testing.T, existingBody, expectedUpdatedBody string)
 					Body: io.NopCloser(strings.NewReader(`{
 						"data": {
 							"repository": {
-								"owner": {"login": "ifloresarg"},
+								"owner": {"login": "octocat"},
 								"name": "gh-projects",
 								"pullRequest": {
 									"id": "PR_1",
 									"number": 12,
 									"title": "Link issue",
-									"url": "https://github.com/ifloresarg/gh-projects/pull/12",
+									"url": "https://github.com/octocat/gh-projects/pull/12",
 									"body": ` + strconvQuoteJSON(existingBody) + `,
 									"state": "OPEN"
 								}
@@ -112,12 +112,12 @@ func TestLinkPRToIssueAppendsClosingKeyword(t *testing.T) {
 		{
 			name:         "append to empty body",
 			existingBody: "",
-			wantBody:     "\n\nCloses ifloresarg/gh-projects#34",
+			wantBody:     "\n\nCloses octocat/gh-projects#34",
 		},
 		{
 			name:         "append to existing body",
 			existingBody: "This PR updates the board rendering.",
-			wantBody:     "This PR updates the board rendering.\n\nCloses ifloresarg/gh-projects#34",
+			wantBody:     "This PR updates the board rendering.\n\nCloses octocat/gh-projects#34",
 		},
 	}
 
@@ -127,7 +127,7 @@ func TestLinkPRToIssueAppendsClosingKeyword(t *testing.T) {
 
 			client, callCount := newLinkPRTestClient(t, tt.existingBody, tt.wantBody)
 
-			if err := client.LinkPRToIssue("ifloresarg", "gh-projects", 12, 34); err != nil {
+			if err := client.LinkPRToIssue("octocat", "gh-projects", 12, 34); err != nil {
 				t.Fatalf("LinkPRToIssue() error = %v", err)
 			}
 

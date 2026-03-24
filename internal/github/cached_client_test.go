@@ -17,12 +17,12 @@ func TestCachedClientListProjectsCachesReadOperations(t *testing.T) {
 		},
 	}, time.Minute)
 
-	first, err := client.ListProjects("ifloresarg")
+	first, err := client.ListProjects("octocat")
 	if err != nil {
 		t.Fatalf("ListProjects() first call error = %v", err)
 	}
 
-	second, err := client.ListProjects("ifloresarg")
+	second, err := client.ListProjects("octocat")
 	if err != nil {
 		t.Fatalf("ListProjects() second call error = %v", err)
 	}
@@ -80,10 +80,10 @@ func TestCachedClientMutationInvalidatesReadCaches(t *testing.T) {
 		},
 	}, time.Minute)
 
-	if _, err := client.ListProjects("ifloresarg"); err != nil {
+	if _, err := client.ListProjects("octocat"); err != nil {
 		t.Fatalf("ListProjects() initial call error = %v", err)
 	}
-	if _, err := client.ListProjects("ifloresarg"); err != nil {
+	if _, err := client.ListProjects("octocat"); err != nil {
 		t.Fatalf("ListProjects() cached call error = %v", err)
 	}
 	if listCalls != 1 {
@@ -97,7 +97,7 @@ func TestCachedClientMutationInvalidatesReadCaches(t *testing.T) {
 		t.Fatalf("MoveItem() inner call count = %d, want 1", moveCalls)
 	}
 
-	if _, err := client.ListProjects("ifloresarg"); err != nil {
+	if _, err := client.ListProjects("octocat"); err != nil {
 		t.Fatalf("ListProjects() after invalidation error = %v", err)
 	}
 	if listCalls != 2 {
@@ -118,7 +118,7 @@ func TestCachedClientReadErrorsAreNotCached(t *testing.T) {
 	}, time.Minute)
 
 	for range 2 {
-		_, err := client.ListRepositoryLabels("ifloresarg", "gh-projects")
+		_, err := client.ListRepositoryLabels("octocat", "gh-projects")
 		if !errors.Is(err, wantErr) {
 			t.Fatalf("ListRepositoryLabels() error = %v, want %v", err, wantErr)
 		}
@@ -143,7 +143,7 @@ func TestCachedClientListRepositoryPullRequests(t *testing.T) {
 					Title:     "Fix login bug",
 					State:     "OPEN",
 					Author:    User{Login: "octocat"},
-					URL:       "https://github.com/ifloresarg/gh-projects/pull/42",
+					URL:       "https://github.com/octocat/gh-projects/pull/42",
 					CreatedAt: time.Now(),
 					RepoOwner: owner,
 					RepoName:  repo,
@@ -152,12 +152,12 @@ func TestCachedClientListRepositoryPullRequests(t *testing.T) {
 		},
 	}, time.Minute)
 
-	first, err := client.ListRepositoryPullRequests("ifloresarg", "gh-projects", 200)
+	first, err := client.ListRepositoryPullRequests("octocat", "gh-projects", 200)
 	if err != nil {
 		t.Fatalf("ListRepositoryPullRequests() first call error = %v", err)
 	}
 
-	second, err := client.ListRepositoryPullRequests("ifloresarg", "gh-projects", 200)
+	second, err := client.ListRepositoryPullRequests("octocat", "gh-projects", 200)
 	if err != nil {
 		t.Fatalf("ListRepositoryPullRequests() second call error = %v", err)
 	}
@@ -181,12 +181,12 @@ func TestCachedClientListAssignableUsersCachesReadOperations(t *testing.T) {
 		},
 	}, time.Minute)
 
-	first, err := client.ListAssignableUsers("ifloresarg", "gh-projects")
+	first, err := client.ListAssignableUsers("octocat", "gh-projects")
 	if err != nil {
 		t.Fatalf("ListAssignableUsers() first call error = %v", err)
 	}
 
-	second, err := client.ListAssignableUsers("ifloresarg", "gh-projects")
+	second, err := client.ListAssignableUsers("octocat", "gh-projects")
 	if err != nil {
 		t.Fatalf("ListAssignableUsers() second call error = %v", err)
 	}
@@ -212,7 +212,7 @@ func TestCachedClientListAssignableUsersErrorsAreNotCached(t *testing.T) {
 	}, time.Minute)
 
 	for range 2 {
-		_, err := client.ListAssignableUsers("ifloresarg", "gh-projects")
+		_, err := client.ListAssignableUsers("octocat", "gh-projects")
 		if !errors.Is(err, wantErr) {
 			t.Fatalf("ListAssignableUsers() error = %v, want %v", err, wantErr)
 		}
@@ -239,24 +239,24 @@ func TestCachedClientListAssignableUsersMutationInvalidatesCache(t *testing.T) {
 		},
 	}, time.Minute)
 
-	if _, err := client.ListAssignableUsers("ifloresarg", "gh-projects"); err != nil {
+	if _, err := client.ListAssignableUsers("octocat", "gh-projects"); err != nil {
 		t.Fatalf("ListAssignableUsers() initial call error = %v", err)
 	}
-	if _, err := client.ListAssignableUsers("ifloresarg", "gh-projects"); err != nil {
+	if _, err := client.ListAssignableUsers("octocat", "gh-projects"); err != nil {
 		t.Fatalf("ListAssignableUsers() cached call error = %v", err)
 	}
 	if listCalls != 1 {
 		t.Fatalf("ListAssignableUsers() inner call count before mutation = %d, want 1", listCalls)
 	}
 
-	if err := client.AssignUser("ifloresarg", "gh-projects", 1, "octocat"); err != nil {
+	if err := client.AssignUser("octocat", "gh-projects", 1, "octocat"); err != nil {
 		t.Fatalf("AssignUser() error = %v", err)
 	}
 	if assignCalls != 1 {
 		t.Fatalf("AssignUser() inner call count = %d, want 1", assignCalls)
 	}
 
-	if _, err := client.ListAssignableUsers("ifloresarg", "gh-projects"); err != nil {
+	if _, err := client.ListAssignableUsers("octocat", "gh-projects"); err != nil {
 		t.Fatalf("ListAssignableUsers() after invalidation error = %v", err)
 	}
 	if listCalls != 2 {

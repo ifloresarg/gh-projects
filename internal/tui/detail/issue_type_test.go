@@ -12,7 +12,7 @@ import (
 func issueTypeTestIssue(issueType string) *github.Issue {
 	return &github.Issue{
 		ID:        "I_123",
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 		IssueType: issueType,
 	}
@@ -70,8 +70,8 @@ func TestIssueTypeInit(t *testing.T) {
 			client := &github.MockClient{
 				ListIssueTypesFn: func(owner, repo string) ([]github.IssueType, error) {
 					listed = true
-					if owner != "ifloresarg" || repo != "gh-projects" {
-						t.Fatalf("ListIssueTypes args = (%q, %q), want (%q, %q)", owner, repo, "ifloresarg", "gh-projects")
+					if owner != "octocat" || repo != "gh-projects" {
+						t.Fatalf("ListIssueTypes args = (%q, %q), want (%q, %q)", owner, repo, "octocat", "gh-projects")
 					}
 					return []github.IssueType{{ID: "IT_1", Name: "Bug"}}, nil
 				},

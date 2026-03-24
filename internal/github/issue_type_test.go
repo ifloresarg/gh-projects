@@ -72,7 +72,7 @@ func TestGetProjectItemsUsesNativeIssueTypeWhenProjectTypeMissing(t *testing.T) 
 								"labels": {"nodes": []},
 								"createdAt": "2026-03-22T00:00:00Z",
 								"updatedAt": "2026-03-22T01:00:00Z",
-								"repository": {"owner": {"login": "ifloresarg"}, "name": "gh-projects"},
+								"repository": {"owner": {"login": "octocat"}, "name": "gh-projects"},
 								"issueType": {"name": "Bug"}
 							},
 							"fieldValues": {"nodes": []}
@@ -125,7 +125,7 @@ func TestGetProjectItemsPrefersCustomProjectTypeOverNativeIssueType(t *testing.T
 								"labels": {"nodes": []},
 								"createdAt": "2026-03-22T00:00:00Z",
 								"updatedAt": "2026-03-22T01:00:00Z",
-								"repository": {"owner": {"login": "ifloresarg"}, "name": "gh-projects"},
+								"repository": {"owner": {"login": "octocat"}, "name": "gh-projects"},
 								"issueType": {"name": "Feature"}
 							},
 							"fieldValues": {

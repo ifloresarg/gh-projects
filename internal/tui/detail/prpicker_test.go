@@ -16,7 +16,7 @@ func loadPRPicker(t *testing.T, prs []github.PullRequest, window time.Duration) 
 		ListRepositoryPullRequestsFn: func(owner, repo string, limit int) ([]github.PullRequest, error) {
 			return prs, nil
 		},
-	}, []RepoRef{{Owner: "ifloresarg", Name: "gh-projects"}}, window, 200)
+	}, []RepoRef{{Owner: "octocat", Name: "gh-projects"}}, window, 200)
 
 	cmd := m.Init()
 	if cmd == nil {
@@ -52,7 +52,7 @@ func TestPRPickerMergedWithinWindowIncluded(t *testing.T) {
 		Author:    github.User{Login: "octocat"},
 		CreatedAt: now.Add(-24 * time.Hour),
 		MergedAt:  now.Add(-1 * time.Hour),
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}}, 12*time.Hour)
 
@@ -72,7 +72,7 @@ func TestPRPickerMergedOutsideWindowExcluded(t *testing.T) {
 		Author:    github.User{Login: "octocat"},
 		CreatedAt: now.Add(-48 * time.Hour),
 		MergedAt:  now.Add(-25 * time.Hour),
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}}, 12*time.Hour)
 
@@ -91,7 +91,7 @@ func TestPRPickerOpenAlwaysIncluded(t *testing.T) {
 		State:     "OPEN",
 		Author:    github.User{Login: "octocat"},
 		CreatedAt: now.Add(-30 * 24 * time.Hour),
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}}, 12*time.Hour)
 
@@ -107,7 +107,7 @@ func TestPRPickerMergedDescriptionContainsMerged(t *testing.T) {
 		State:     "MERGED",
 		Author:    github.User{Login: "octocat"},
 		MergedAt:  time.Now().Add(-1 * time.Hour),
-		RepoOwner: "ifloresarg",
+		RepoOwner: "octocat",
 		RepoName:  "gh-projects",
 	}}).Description()
 
@@ -127,7 +127,7 @@ func TestPRPickerSortByEffectiveTime(t *testing.T) {
 			State:     "OPEN",
 			Author:    github.User{Login: "octocat"},
 			CreatedAt: now.Add(-2 * time.Hour),
-			RepoOwner: "ifloresarg",
+			RepoOwner: "octocat",
 			RepoName:  "gh-projects",
 		},
 		{
@@ -137,7 +137,7 @@ func TestPRPickerSortByEffectiveTime(t *testing.T) {
 			Author:    github.User{Login: "octocat"},
 			CreatedAt: now.Add(-30 * 24 * time.Hour),
 			MergedAt:  now.Add(-1 * time.Hour),
-			RepoOwner: "ifloresarg",
+			RepoOwner: "octocat",
 			RepoName:  "gh-projects",
 		},
 	}, 12*time.Hour)
