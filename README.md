@@ -97,7 +97,6 @@ You can use `gh-projects` inside Neovim as a floating terminal.
 ```lua
 return {
   "ifloresarg/gh-projects",
-  -- Point this to your local clone of the repo
   config = function()
     require("gh-projects").setup({
       binary = "gh projects",
