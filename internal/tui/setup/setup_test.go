@@ -22,11 +22,61 @@ func TestSetupWizardScenarios(t *testing.T) {
 		run  func(*testing.T)
 	}{
 		{
-			name: "step 1 empty owner blocks continue",
+			name: "step 1 discover choice is initial view",
 			run: func(t *testing.T) {
 				t.Parallel()
 
 				m := New(&github.MockClient{})
+
+				if m.step != stepDiscoverChoice {
+					t.Fatalf("step = %v, want %v", m.step, stepDiscoverChoice)
+				}
+
+				view := m.View()
+				for _, text := range []string{"Auto-discover all organizations", "Enter specific owner"} {
+					if !strings.Contains(view, text) {
+						t.Fatalf("View() missing %q in %q", text, view)
+					}
+				}
+			},
+		},
+		{
+			name: "step 1 auto-discover completes setup",
+			run: func(t *testing.T) {
+				t.Parallel()
+
+				m := New(&github.MockClient{})
+				_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+				complete := requireCompleteMsg(t, cmd)
+				if complete.Owner != "" || complete.Project != 0 || complete.View != "" {
+					t.Fatalf("SetupCompleteMsg = %#v, want empty owner/project/view", complete)
+				}
+			},
+		},
+		{
+			name: "step 1 j enter moves to specific owner",
+			run: func(t *testing.T) {
+				t.Parallel()
+
+				m := New(&github.MockClient{})
+				updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+				updated, cmd := updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+				if updated.step != stepOwner {
+					t.Fatalf("step = %v, want %v", updated.step, stepOwner)
+				}
+				if cmd != nil {
+					t.Fatalf("cmd = %v, want nil", cmd)
+				}
+			},
+		},
+		{
+			name: "step 2 empty owner blocks continue",
+			run: func(t *testing.T) {
+				t.Parallel()
+
+				m := enterSpecificOwnerStep(t, New(&github.MockClient{}))
 				updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 				if updated.step != stepOwner {
@@ -40,11 +90,11 @@ func TestSetupWizardScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "step 1 non-empty owner proceeds",
+			name: "step 2 non-empty owner proceeds",
 			run: func(t *testing.T) {
 				t.Parallel()
 
-				m := New(&github.MockClient{})
+				m := enterSpecificOwnerStep(t, New(&github.MockClient{}))
 				m = typeOwner(t, m, "testorg")
 
 				updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -64,6 +114,29 @@ func TestSetupWizardScenarios(t *testing.T) {
 				m := New(&github.MockClient{})
 				_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 				requireCancelMsg(t, cmd)
+			},
+		},
+		{
+			name: "step 2 esc goes back to discover choice",
+			run: func(t *testing.T) {
+				t.Parallel()
+
+				m := enterSpecificOwnerStep(t, New(&github.MockClient{}))
+				m = typeOwner(t, m, "testorg")
+
+				updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+				if updated.step != stepDiscoverChoice {
+					t.Fatalf("step = %v, want %v", updated.step, stepDiscoverChoice)
+				}
+				if updated.discoverCursor != 0 {
+					t.Fatalf("discoverCursor = %d, want 0", updated.discoverCursor)
+				}
+				if updated.owner() != "" {
+					t.Fatalf("owner = %q, want empty", updated.owner())
+				}
+				if cmd != nil {
+					t.Fatalf("cmd = %v, want nil", cmd)
+				}
 			},
 		},
 		{
@@ -532,9 +605,25 @@ func typeOwner(t *testing.T, m Model, owner string) Model {
 	return updated
 }
 
+func enterSpecificOwnerStep(t *testing.T, m Model) Model {
+	t.Helper()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	updated, cmd := updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.step != stepOwner {
+		t.Fatalf("step = %v, want %v", updated.step, stepOwner)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+
+	return updated
+}
+
 func submitOwner(t *testing.T, m Model, owner string) (Model, tea.Cmd) {
 	t.Helper()
 
+	m = enterSpecificOwnerStep(t, m)
 	m = typeOwner(t, m, owner)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {

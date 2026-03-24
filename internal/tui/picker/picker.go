@@ -1,7 +1,9 @@
 package picker
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -20,33 +22,44 @@ type projectsLoadedMsg struct {
 }
 
 type item struct {
-	project github.Project
+	project    github.Project
+	multiOwner bool
 }
 
-func (i item) Title() string       { return fmt.Sprintf("#%d %s", i.project.Number, i.project.Title) }
+func (i item) Title() string {
+	if i.multiOwner {
+		return fmt.Sprintf("%s · #%d %s", i.project.Owner, i.project.Number, i.project.Title)
+	}
+
+	return fmt.Sprintf("#%d %s", i.project.Number, i.project.Title)
+}
+
 func (i item) Description() string { return fmt.Sprintf("%d items", i.project.ItemCount) }
-func (i item) FilterValue() string { return i.project.Title }
+
+func (i item) FilterValue() string {
+	if i.multiOwner {
+		return i.project.Owner + " " + i.project.Title
+	}
+
+	return i.project.Title
+}
 
 type Model struct {
-	client  github.GitHubClient
-	owner   string
-	list    list.Model
-	spinner spinner.Model
-	loading bool
-	err     error
-	width   int
-	height  int
+	client     github.GitHubClient
+	owner      string
+	multiOwner bool
+	list       list.Model
+	spinner    spinner.Model
+	loading    bool
+	err        error
+	infoNote   string
+	width      int
+	height     int
 }
 
 func New(client github.GitHubClient, owner string) Model {
-	l := list.New(nil, list.NewDefaultDelegate(), 0, 0)
+	l, s := newPickerListAndSpinner()
 	l.Title = fmt.Sprintf("GitHub Projects · %s", owner)
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(true)
-	l.SetShowHelp(true)
-
-	s := spinner.New()
-	s.Spinner = spinner.Dot
 
 	return Model{
 		client:  client,
@@ -57,7 +70,36 @@ func New(client github.GitHubClient, owner string) Model {
 	}
 }
 
+func NewMultiOwner(client github.GitHubClient) Model {
+	l, s := newPickerListAndSpinner()
+	l.Title = "GitHub Projects · All Organizations"
+
+	return Model{
+		client:     client,
+		multiOwner: true,
+		list:       l,
+		spinner:    s,
+		loading:    true,
+	}
+}
+
+func newPickerListAndSpinner() (list.Model, spinner.Model) {
+	l := list.New(nil, list.NewDefaultDelegate(), 0, 0)
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(true)
+	l.SetShowHelp(true)
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+
+	return l, s
+}
+
 func (m Model) Init() tea.Cmd {
+	if m.multiOwner {
+		return tea.Batch(m.spinner.Tick, fetchAllProjects(m.client))
+	}
+
 	return tea.Batch(m.spinner.Tick, fetchProjects(m.client, m.owner))
 }
 
@@ -66,6 +108,25 @@ func fetchProjects(client github.GitHubClient, owner string) tea.Cmd {
 		projects, err := client.ListProjects(owner)
 		return projectsLoadedMsg{projects: projects, err: err}
 	}
+}
+
+func fetchAllProjects(client github.GitHubClient) tea.Cmd {
+	return func() tea.Msg {
+		projects, err := client.ListAllAccessibleProjects()
+		return projectsLoadedMsg{projects: projects, err: err}
+	}
+}
+
+func isPartialScopeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, github.ErrMissingScopeReadOrg) {
+		return true
+	}
+
+	return strings.Contains(err.Error(), github.ErrMissingScopeReadOrg.Error())
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -77,14 +138,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	case projectsLoadedMsg:
 		m.loading = false
-		m.err = msg.err
-		if msg.err != nil {
+		m.err = nil
+		m.infoNote = ""
+		if msg.err != nil && !m.multiOwner || msg.err != nil && !isPartialScopeError(msg.err) {
+			m.err = msg.err
 			return m, nil
+		}
+		if m.multiOwner && isPartialScopeError(msg.err) {
+			m.infoNote = "Note: some organization projects may be unavailable."
 		}
 
 		items := make([]list.Item, 0, len(msg.projects))
 		for _, project := range msg.projects {
-			items = append(items, item{project: project})
+			items = append(items, item{project: project, multiOwner: m.multiOwner})
 		}
 		m.list.SetItems(items)
 		return m, nil
@@ -134,6 +200,10 @@ func (m Model) View() string {
 			return content
 		}
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+
+	if m.infoNote != "" {
+		return m.infoNote + "\n\n" + m.list.View()
 	}
 
 	return m.list.View()

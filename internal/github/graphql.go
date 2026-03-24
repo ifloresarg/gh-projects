@@ -1,13 +1,18 @@
 package github
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	graphql "github.com/cli/shurcooL-graphql"
 )
+
+var ErrMissingScopeReadOrg = errors.New("missing required scope: read:org")
 
 type GraphQLClient struct {
 	client *api.GraphQLClient
@@ -21,6 +26,133 @@ func NewGraphQLClient() (*GraphQLClient, error) {
 		return nil, err
 	}
 	return &GraphQLClient{client: client}, nil
+}
+
+func (g *GraphQLClient) ListViewerOrganizations() ([]string, error) {
+	organizations := make([]string, 0, 32)
+	var after *graphql.String
+
+	for {
+		var query struct {
+			Viewer struct {
+				Organizations struct {
+					Nodes []struct {
+						Login string
+					} `graphql:"nodes"`
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"organizations(first: 100, after: $after)"`
+			}
+		}
+
+		vars := map[string]interface{}{"after": after}
+		if err := g.client.Query("ListViewerOrganizations", &query, vars); err != nil {
+			if strings.Contains(err.Error(), "insufficient scopes") || strings.Contains(err.Error(), "read:org") {
+				return nil, ErrMissingScopeReadOrg
+			}
+			return nil, fmt.Errorf("query viewer organizations: %w", err)
+		}
+
+		for _, n := range query.Viewer.Organizations.Nodes {
+			organizations = append(organizations, n.Login)
+		}
+
+		if !query.Viewer.Organizations.PageInfo.HasNextPage {
+			break
+		}
+
+		end := graphql.String(query.Viewer.Organizations.PageInfo.EndCursor)
+		after = &end
+	}
+
+	return organizations, nil
+}
+
+func (g *GraphQLClient) ListViewerLogin() (string, error) {
+	var query struct {
+		Viewer struct {
+			Login string
+		}
+	}
+
+	if err := g.client.Query("ListViewerLogin", &query, nil); err != nil {
+		return "", fmt.Errorf("query viewer login: %w", err)
+	}
+
+	return query.Viewer.Login, nil
+}
+
+func (g *GraphQLClient) ListAllAccessibleProjects() ([]Project, error) {
+	return listAllAccessibleProjects(g)
+}
+
+type accessibleProjectsLister interface {
+	ListViewerLogin() (string, error)
+	ListViewerOrganizations() ([]string, error)
+	ListProjects(owner string) ([]Project, error)
+}
+
+func listAllAccessibleProjects(client accessibleProjectsLister) ([]Project, error) {
+	viewerLogin, err := client.ListViewerLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	var partialScopeErr error
+	organizations, err := client.ListViewerOrganizations()
+	if err != nil {
+		if !errors.Is(err, ErrMissingScopeReadOrg) {
+			return nil, err
+		}
+		organizations = nil
+		partialScopeErr = ErrMissingScopeReadOrg
+	}
+
+	owners := make([]string, 0, 1+len(organizations))
+	owners = append(owners, viewerLogin)
+	owners = append(owners, organizations...)
+
+	allProjects := make([]Project, 0, len(owners))
+	errCh := make(chan error, len(owners))
+
+	var (
+		mu sync.Mutex
+		wg sync.WaitGroup
+	)
+
+	for _, owner := range owners {
+		wg.Add(1)
+		go func(o string) {
+			defer wg.Done()
+
+			projects, listErr := client.ListProjects(o)
+			if listErr != nil {
+				errCh <- fmt.Errorf("list projects for owner %q: %w", o, listErr)
+				return
+			}
+
+			mu.Lock()
+			allProjects = append(allProjects, projects...)
+			mu.Unlock()
+		}(owner)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for fetchErr := range errCh {
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+	}
+
+	sort.Slice(allProjects, func(i, j int) bool {
+		return allProjects[i].Owner < allProjects[j].Owner
+	})
+
+	return allProjects, partialScopeErr
 }
 
 func (g *GraphQLClient) ListProjects(owner string) ([]Project, error) {

@@ -63,14 +63,20 @@ func NewApp(cfg config.Config, client github.GitHubClient) App {
 		keys:   DefaultKeyMap,
 	}
 
-	if cfg.DefaultOwner == "" {
+	if !cfg.OwnerFromFlag && cfg.DefaultOwner == "" && cfg.DefaultProject == 0 {
 		a.state = ViewSetup
 		a.setup = setup.New(client)
 		return a
 	}
 
+	if cfg.OwnerFromFlag {
+		a.state = ViewPicker
+		a.picker = picker.New(client, cfg.DefaultOwner)
+		return a
+	}
+
 	a.state = ViewPicker
-	a.picker = picker.New(client, cfg.DefaultOwner)
+	a.picker = picker.NewMultiOwner(client)
 	return a
 }
 
@@ -173,7 +179,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		a.loadErr = ""
-		a.picker = picker.New(a.client, msg.Owner)
+		if msg.Owner == "" {
+			a.picker = picker.NewMultiOwner(a.client)
+		} else {
+			a.picker = picker.New(a.client, msg.Owner)
+		}
 		a.state = ViewPicker
 		if a.width > 0 || a.height > 0 {
 			a.picker, _ = a.picker.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})

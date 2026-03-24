@@ -263,3 +263,108 @@ func TestCachedClientListAssignableUsersMutationInvalidatesCache(t *testing.T) {
 		t.Fatalf("ListAssignableUsers() inner call count after invalidation = %d, want 2", listCalls)
 	}
 }
+
+func TestCachedClientListViewerOrganizationsCachesResult(t *testing.T) {
+	t.Parallel()
+
+	callCount := 0
+	client := NewCachedClient(&MockClient{
+		ListViewerOrganizationsFn: func() ([]string, error) {
+			callCount++
+			return []string{"org1", "org2"}, nil
+		},
+	}, time.Minute)
+
+	first, err := client.ListViewerOrganizations()
+	if err != nil {
+		t.Fatalf("ListViewerOrganizations() first call error = %v", err)
+	}
+
+	second, err := client.ListViewerOrganizations()
+	if err != nil {
+		t.Fatalf("ListViewerOrganizations() second call error = %v", err)
+	}
+
+	if callCount != 1 {
+		t.Fatalf("ListViewerOrganizations() inner call count = %d, want 1", callCount)
+	}
+	if len(first) != 2 || len(second) != 2 || first[0] != second[0] {
+		t.Fatalf("cached results mismatch: first=%v second=%v", first, second)
+	}
+}
+
+func TestCachedClientListViewerLoginCachesResult(t *testing.T) {
+	t.Parallel()
+
+	callCount := 0
+	client := NewCachedClient(&MockClient{
+		ListViewerLoginFn: func() (string, error) {
+			callCount++
+			return "octocat", nil
+		},
+	}, time.Minute)
+
+	first, err := client.ListViewerLogin()
+	if err != nil {
+		t.Fatalf("ListViewerLogin() first call error = %v", err)
+	}
+
+	second, err := client.ListViewerLogin()
+	if err != nil {
+		t.Fatalf("ListViewerLogin() second call error = %v", err)
+	}
+
+	if callCount != 1 {
+		t.Fatalf("ListViewerLogin() inner call count = %d, want 1", callCount)
+	}
+	if first != "octocat" || second != "octocat" || first != second {
+		t.Fatalf("cached results mismatch: first=%s second=%s", first, second)
+	}
+}
+
+func TestCachedClientListAllAccessibleProjectsCachesResult(t *testing.T) {
+	t.Parallel()
+
+	callCount := 0
+	client := NewCachedClient(&MockClient{
+		ListAllAccessibleProjectsFn: func() ([]Project, error) {
+			callCount++
+			return []Project{{ID: "p1", Title: "Project 1"}, {ID: "p2", Title: "Project 2"}}, nil
+		},
+	}, time.Minute)
+
+	first, err := client.ListAllAccessibleProjects()
+	if err != nil {
+		t.Fatalf("ListAllAccessibleProjects() first call error = %v", err)
+	}
+
+	second, err := client.ListAllAccessibleProjects()
+	if err != nil {
+		t.Fatalf("ListAllAccessibleProjects() second call error = %v", err)
+	}
+
+	if callCount != 1 {
+		t.Fatalf("ListAllAccessibleProjects() inner call count = %d, want 1", callCount)
+	}
+	if len(first) != 2 || len(second) != 2 || first[0].ID != second[0].ID {
+		t.Fatalf("cached results mismatch: first=%v second=%v", first, second)
+	}
+}
+
+func TestCachedClientListAllAccessibleProjectsPassesThroughPartialScopeError(t *testing.T) {
+	t.Parallel()
+
+	client := NewCachedClient(&MockClient{
+		ListAllAccessibleProjectsFn: func() ([]Project, error) {
+			return []Project{{ID: "p1", Title: "Personal Project", Owner: "octocat"}}, ErrMissingScopeReadOrg
+		},
+	}, time.Minute)
+
+	projects, err := client.ListAllAccessibleProjects()
+	if !errors.Is(err, ErrMissingScopeReadOrg) {
+		t.Fatalf("ListAllAccessibleProjects() error = %v, want ErrMissingScopeReadOrg", err)
+	}
+	if len(projects) != 1 || projects[0].ID != "p1" {
+		t.Fatalf("ListAllAccessibleProjects() projects = %v, want 1 partial result", projects)
+	}
+}

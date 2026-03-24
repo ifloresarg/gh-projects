@@ -29,4 +29,8 @@ type GitHubClient interface {
 	ReopenIssue(owner, repo string, number int) error
 	LinkPRToIssue(owner, repo string, prNumber, issueNumber int) error
 	AddItemToProject(projectID string, contentID string) error
+
+	ListViewerOrganizations() ([]string, error)
+	ListViewerLogin() (string, error)
+	ListAllAccessibleProjects() ([]Project, error)
 }

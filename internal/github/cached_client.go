@@ -1,6 +1,7 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,33 +10,39 @@ import (
 
 // CachedClient wraps a GitHubClient with in-memory caching for read operations.
 type CachedClient struct {
-	inner      GitHubClient
-	projects   *cache.Cache[[]Project]
-	items      *cache.Cache[[]ProjectItem]
-	fields     *cache.Cache[[]ProjectField]
-	views      *cache.Cache[[]ProjectView]
-	issues     *cache.Cache[*Issue]
-	comments   *cache.Cache[[]Comment]
-	labels     *cache.Cache[[]Label]
-	prs        *cache.Cache[[]PullRequest]
-	users      *cache.Cache[[]User]
-	issueTypes *cache.Cache[[]IssueType]
+	inner       GitHubClient
+	projects    *cache.Cache[[]Project]
+	items       *cache.Cache[[]ProjectItem]
+	fields      *cache.Cache[[]ProjectField]
+	views       *cache.Cache[[]ProjectView]
+	issues      *cache.Cache[*Issue]
+	comments    *cache.Cache[[]Comment]
+	labels      *cache.Cache[[]Label]
+	prs         *cache.Cache[[]PullRequest]
+	users       *cache.Cache[[]User]
+	issueTypes  *cache.Cache[[]IssueType]
+	viewerOrgs  *cache.Cache[[]string]
+	viewerLogin *cache.Cache[string]
+	allProjects *cache.Cache[[]Project]
 }
 
 // NewCachedClient creates a CachedClient wrapping inner with the given TTL.
 func NewCachedClient(inner GitHubClient, ttl time.Duration) *CachedClient {
 	return &CachedClient{
-		inner:      inner,
-		projects:   cache.New[[]Project](ttl),
-		items:      cache.New[[]ProjectItem](ttl),
-		fields:     cache.New[[]ProjectField](ttl),
-		views:      cache.New[[]ProjectView](ttl),
-		issues:     cache.New[*Issue](ttl),
-		comments:   cache.New[[]Comment](ttl),
-		labels:     cache.New[[]Label](ttl),
-		prs:        cache.New[[]PullRequest](ttl),
-		users:      cache.New[[]User](ttl),
-		issueTypes: cache.New[[]IssueType](ttl),
+		inner:       inner,
+		projects:    cache.New[[]Project](ttl),
+		items:       cache.New[[]ProjectItem](ttl),
+		fields:      cache.New[[]ProjectField](ttl),
+		views:       cache.New[[]ProjectView](ttl),
+		issues:      cache.New[*Issue](ttl),
+		comments:    cache.New[[]Comment](ttl),
+		labels:      cache.New[[]Label](ttl),
+		prs:         cache.New[[]PullRequest](ttl),
+		users:       cache.New[[]User](ttl),
+		issueTypes:  cache.New[[]IssueType](ttl),
+		viewerOrgs:  cache.New[[]string](ttl),
+		viewerLogin: cache.New[string](ttl),
+		allProjects: cache.New[[]Project](ttl),
 	}
 }
 
@@ -51,6 +58,9 @@ func (c *CachedClient) InvalidateAll() {
 	c.prs.InvalidateAll()
 	c.users.InvalidateAll()
 	c.issueTypes.InvalidateAll()
+	c.viewerOrgs.InvalidateAll()
+	c.viewerLogin.InvalidateAll()
+	c.allProjects.InvalidateAll()
 }
 
 func (c *CachedClient) ListProjects(owner string) ([]Project, error) {
@@ -271,6 +281,47 @@ func (c *CachedClient) LinkPRToIssue(owner, repo string, prNumber, issueNumber i
 func (c *CachedClient) AddItemToProject(projectID string, contentID string) error {
 	c.InvalidateAll()
 	return c.inner.AddItemToProject(projectID, contentID)
+}
+
+func (c *CachedClient) ListViewerOrganizations() ([]string, error) {
+	key := "viewer-orgs"
+	if val, ok := c.viewerOrgs.Get(key); ok {
+		return val, nil
+	}
+	result, err := c.inner.ListViewerOrganizations()
+	if err != nil {
+		return nil, err
+	}
+	c.viewerOrgs.Set(key, result)
+	return result, nil
+}
+
+func (c *CachedClient) ListViewerLogin() (string, error) {
+	key := "viewer-login"
+	if val, ok := c.viewerLogin.Get(key); ok {
+		return val, nil
+	}
+	result, err := c.inner.ListViewerLogin()
+	if err != nil {
+		return "", err
+	}
+	c.viewerLogin.Set(key, result)
+	return result, nil
+}
+
+func (c *CachedClient) ListAllAccessibleProjects() ([]Project, error) {
+	key := "all-projects"
+	if val, ok := c.allProjects.Get(key); ok {
+		return val, nil
+	}
+	result, err := c.inner.ListAllAccessibleProjects()
+	if err != nil && !errors.Is(err, ErrMissingScopeReadOrg) {
+		return nil, err
+	}
+	if result != nil {
+		c.allProjects.Set(key, result)
+	}
+	return result, err
 }
 
 var _ GitHubClient = &CachedClient{}

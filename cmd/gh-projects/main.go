@@ -35,6 +35,7 @@ func main() {
 
 	if *owner != "" {
 		cfg.DefaultOwner = *owner
+		cfg.OwnerFromFlag = true
 	}
 	if *number != 0 {
 		cfg.DefaultProject = *number

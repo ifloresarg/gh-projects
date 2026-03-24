@@ -22,31 +22,6 @@ function M.setup(opts)
 	})
 end
 
--- Extract owner from git remote URL
-local function get_repo_owner()
-	local ok, output = pcall(vim.fn.system, "git remote get-url origin")
-	if not ok or output:match("^fatal") then
-		return nil
-	end
-
-	-- Remove trailing newline
-	output = output:gsub("\n$", "")
-
-	-- Match HTTPS: https://github.com/owner/repo.git
-	local owner_https = output:match("github%.com[:/]([^/]+)/")
-	if owner_https then
-		return owner_https
-	end
-
-	-- Match SSH: git@github.com:owner/repo.git
-	local owner_ssh = output:match("git@github%.com:([^/]+)/")
-	if owner_ssh then
-		return owner_ssh
-	end
-
-	return nil
-end
-
 -- Open the projects TUI in a floating window
 function M.open_projects(args)
 	-- Calculate window dimensions
@@ -86,12 +61,6 @@ function M.open_projects(args)
 		else
 			-- Just owner provided
 			cmd = cmd .. " --owner " .. parts[1]
-		end
-	else
-		-- Auto-detect owner from git remote
-		local owner = get_repo_owner()
-		if owner then
-			cmd = cmd .. " --owner " .. owner
 		end
 	end
 

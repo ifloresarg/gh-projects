@@ -16,6 +16,7 @@ type Config struct {
 	ShowClosedItems bool   `yaml:"show_closed_items"`
 	MergedPRWindow  int    `yaml:"merged_pr_window"`
 	PRFetchLimit    int    `yaml:"pr_fetch_limit"`
+	OwnerFromFlag   bool   `yaml:"-"`
 }
 
 // configPathOverride is used for testing to override the default config path.

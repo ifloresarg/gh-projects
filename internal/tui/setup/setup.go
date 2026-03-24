@@ -14,7 +14,8 @@ import (
 type wizardStep int
 
 const (
-	stepOwner wizardStep = iota
+	stepDiscoverChoice wizardStep = iota
+	stepOwner
 	stepProjectLoading
 	stepProjectSelect
 	stepProjectError
@@ -44,6 +45,7 @@ type viewsLoadedMsg struct {
 
 type Model struct {
 	step            wizardStep
+	discoverCursor  int
 	ownerInput      textinput.Model
 	width           int
 	height          int
@@ -65,9 +67,10 @@ func New(client github.GitHubClient) Model {
 	ownerInput.Width = 40
 
 	return Model{
-		step:       stepOwner,
-		ownerInput: ownerInput,
-		client:     client,
+		step:           stepDiscoverChoice,
+		discoverCursor: 0,
+		ownerInput:     ownerInput,
+		client:         client,
 	}
 }
 
@@ -147,12 +150,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, func() tea.Msg { return SetupCancelMsg{} }
 		case "esc":
-			if m.step == stepOwner {
+			if m.step == stepDiscoverChoice {
 				return m, func() tea.Msg { return SetupCancelMsg{} }
 			}
 			return m.goBack(), nil
 		case "enter":
 			switch m.step {
+			case stepDiscoverChoice:
+				if m.discoverCursor == 0 {
+					return m, completeCmd("", 0, "")
+				}
+				m.step = stepOwner
+				return m, nil
 			case stepOwner:
 				owner := m.owner()
 				if owner == "" {
@@ -203,6 +212,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		case "j", "down":
 			switch m.step {
+			case stepDiscoverChoice:
+				if m.discoverCursor < 1 {
+					m.discoverCursor++
+				}
+				return m, nil
 			case stepProjectSelect:
 				if m.projectCursor < len(m.projects)-1 {
 					m.projectCursor++
@@ -216,6 +230,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		case "k", "up":
 			switch m.step {
+			case stepDiscoverChoice:
+				if m.discoverCursor > 0 {
+					m.discoverCursor--
+				}
+				return m, nil
 			case stepProjectSelect:
 				if m.projectCursor > 0 {
 					m.projectCursor--
@@ -243,6 +262,16 @@ func (m Model) View() string {
 	var content string
 
 	switch m.step {
+	case stepDiscoverChoice:
+		content = strings.Join([]string{
+			lipgloss.NewStyle().Bold(true).Render("Welcome to gh-projects"),
+			"",
+			"How would you like to discover projects?",
+			"",
+			renderDiscoverChoiceList(m.discoverCursor),
+			"",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("j/k ↑/↓ • Enter to select • Esc to quit"),
+		}, "\n")
 	case stepProjectLoading:
 		content = strings.Join([]string{
 			lipgloss.NewStyle().Bold(true).Render("Choose a default project"),
@@ -303,7 +332,7 @@ func (m Model) View() string {
 			"",
 			lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("Enter to retry • Tab to skip • Esc to go back"),
 		}, "\n")
-	default:
+	case stepOwner:
 		content = strings.Join([]string{
 			lipgloss.NewStyle().Bold(true).Render("Welcome to gh-projects"),
 			"",
@@ -341,6 +370,10 @@ func (m Model) goBack() Model {
 	m.err = nil
 
 	switch m.step {
+	case stepOwner:
+		m.step = stepDiscoverChoice
+		m.discoverCursor = 0
+		m.ownerInput.SetValue("")
 	case stepProjectLoading, stepProjectSelect, stepProjectError, stepProjectEmpty:
 		m.step = stepOwner
 		m.projects = nil
@@ -352,6 +385,20 @@ func (m Model) goBack() Model {
 	}
 
 	return m
+}
+
+func renderDiscoverChoiceList(cursor int) string {
+	options := []string{"Auto-discover all organizations", "Enter specific owner"}
+	lines := make([]string, 0, len(options))
+	for i, option := range options {
+		prefix := "  "
+		if i == cursor {
+			prefix = "> "
+		}
+		lines = append(lines, prefix+option)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func renderProjectList(projects []github.Project, cursor int) string {

@@ -31,6 +31,9 @@ type MockClient struct {
 	ReopenIssueFn                func(owner, repo string, number int) error
 	LinkPRToIssueFunc            func(owner, repo string, prNumber, issueNumber int) error
 	AddItemToProjectFn           func(projectID string, contentID string) error
+	ListViewerOrganizationsFn    func() ([]string, error)
+	ListViewerLoginFn            func() (string, error)
+	ListAllAccessibleProjectsFn  func() ([]Project, error)
 }
 
 var _ GitHubClient = &MockClient{}
@@ -381,4 +384,28 @@ func (m *MockClient) AddItemToProject(projectID string, contentID string) error 
 	}
 
 	return nil
+}
+
+func (m *MockClient) ListViewerOrganizations() ([]string, error) {
+	if m.ListViewerOrganizationsFn != nil {
+		return m.ListViewerOrganizationsFn()
+	}
+
+	return nil, nil
+}
+
+func (m *MockClient) ListViewerLogin() (string, error) {
+	if m.ListViewerLoginFn != nil {
+		return m.ListViewerLoginFn()
+	}
+
+	return "", nil
+}
+
+func (m *MockClient) ListAllAccessibleProjects() ([]Project, error) {
+	if m.ListAllAccessibleProjectsFn != nil {
+		return m.ListAllAccessibleProjectsFn()
+	}
+
+	return nil, nil
 }
