@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -30,30 +34,44 @@ const (
 )
 
 type App struct {
-	config          config.Config
-	client          github.GitHubClient
-	state           ViewState
-	quitConfirm     bool
-	loadErr         string
-	setup           setup.Model
-	picker          picker.Model
-	viewpicker      viewpicker.Model
-	board           board.Model
-	detail          detail.Model
-	help            help.Model
-	selectedProject *github.Project
-	width           int
-	height          int
-	keys            KeyMap
-	initialViewName string
-	directMode      bool
+	config           config.Config
+	client           github.GitHubClient
+	state            ViewState
+	quitConfirm      bool
+	loadErr          string
+	setup            setup.Model
+	picker           picker.Model
+	viewpicker       viewpicker.Model
+	board            board.Model
+	detail           detail.Model
+	help             help.Model
+	selectedProject  *github.Project
+	width            int
+	height           int
+	keys             KeyMap
+	owner            string
+	projectNumber    int
+	initialViewName  string
+	directMode       bool
+	configDirectMode bool
 }
 
 type projectResolvedMsg struct {
+	project   *github.Project
+	views     []github.ProjectView
+	err       error
+	fromCache bool
+}
+
+type backgroundRefreshMsg struct {
 	project *github.Project
 	views   []github.ProjectView
+	items   []github.ProjectItem
+	fields  []github.ProjectField
 	err     error
 }
+
+const appDiskCacheVersion = 1
 
 func NewApp(cfg config.Config, client github.GitHubClient) App {
 	a := App{
@@ -72,6 +90,19 @@ func NewApp(cfg config.Config, client github.GitHubClient) App {
 	if cfg.OwnerFromFlag {
 		a.state = ViewPicker
 		a.picker = picker.New(client, cfg.DefaultOwner)
+		return a
+	}
+
+	if !a.directMode && cfg.DefaultOwner != "" && cfg.DefaultProject != 0 && cfg.DefaultView != "" {
+		a.configDirectMode = true
+		a.state = ViewLoading
+		a.initialViewName = cfg.DefaultView
+		if a.owner == "" {
+			a.owner = cfg.DefaultOwner
+		}
+		if a.projectNumber == 0 {
+			a.projectNumber = cfg.DefaultProject
+		}
 		return a
 	}
 
@@ -102,6 +133,25 @@ func (a App) Init() tea.Cmd {
 		client := a.client
 		owner := cfg.DefaultOwner
 		number := cfg.DefaultProject
+		if a.owner != "" {
+			owner = a.owner
+		}
+		if a.projectNumber != 0 {
+			number = a.projectNumber
+		}
+
+		if a.configDirectMode && hasWarmProjectCache(owner, number) {
+			project, err := client.GetProject(owner, number)
+			if err == nil {
+				views, err := client.GetProjectViews(project.ID)
+				if err == nil {
+					return func() tea.Msg {
+						return projectResolvedMsg{project: project, views: views, fromCache: true}
+					}
+				}
+			}
+		}
+
 		return func() tea.Msg {
 			project, err := client.GetProject(owner, number)
 			if err != nil {
@@ -192,6 +242,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case setup.SetupCancelMsg:
 		return a, tea.Quit
 	case projectResolvedMsg:
+		if msg.err != nil && a.configDirectMode {
+			a.configDirectMode = false
+			a.loadErr = "Default project not found or inaccessible, showing project picker"
+			a.picker = picker.NewMultiOwner(a.client)
+			a.state = ViewPicker
+			if a.width > 0 || a.height > 0 {
+				a.picker, _ = a.picker.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+			}
+			return a, a.picker.Init()
+		}
 		if msg.err != nil {
 			a.loadErr = fmt.Sprintf("Error loading project: %v", msg.err)
 			a.state = ViewLoading
@@ -225,6 +285,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if a.width > 0 || a.height > 0 {
 					a.board, _ = a.board.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
 				}
+				if msg.fromCache && a.configDirectMode {
+					return a, tea.Batch(
+						a.board.Init(),
+						backgroundRefreshCmd(a.client, msg.project.Owner, msg.project.Number),
+					)
+				}
 				return a, a.board.Init()
 			}
 		}
@@ -232,7 +298,28 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.loadErr = fmt.Sprintf("View %q not found among board views", a.initialViewName)
 		a.state = ViewLoading
 		return a, nil
+	case backgroundRefreshMsg:
+		if msg.err != nil {
+			a.loadErr = "⚠ Using cached data, refresh failed"
+			return a, nil
+		}
+
+		if a.state != ViewBoard || a.selectedProject == nil {
+			return a, nil
+		}
+
+		if reflect.DeepEqual(a.selectedProject, msg.project) && reflect.DeepEqual(a.board.Items(), msg.items) {
+			return a, nil
+		}
+
+		a.selectedProject = msg.project
+		a.loadErr = "Board updated"
+		return a, a.board.Init()
 	case picker.ProjectSelectedMsg:
+		// Enforce single-project disk cache: clear stale project data before switching.
+		if cc, ok := a.client.(*github.CachedClient); ok {
+			cc.InvalidateAll()
+		}
 		a.loadErr = ""
 		a.selectedProject = &msg.Project
 		if cfg, err := config.Load(); err == nil {
@@ -272,6 +359,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, a.viewpicker.Init()
 		}
 		return a, nil
+	case board.SwitchProjectMsg:
+		a.picker = picker.NewMultiOwner(a.client)
+		a.state = ViewPicker
+		if a.width > 0 || a.height > 0 {
+			a.picker, _ = a.picker.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+		}
+		return a, a.picker.Init()
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return a, tea.Quit
@@ -326,12 +420,25 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if a.state == ViewPicker {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && key.Matches(keyMsg, a.keys.Owners) {
+			a.setup = setup.New(a.client)
+			a.state = ViewSetup
+			return a, a.setup.Init()
+		}
 		var cmd tea.Cmd
 		a.picker, cmd = a.picker.Update(msg)
 		return a, cmd
 	}
 
 	if a.state == ViewViewPicker {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && key.Matches(keyMsg, a.keys.Projects) {
+			a.picker = picker.NewMultiOwner(a.client)
+			a.state = ViewPicker
+			if a.width > 0 || a.height > 0 {
+				a.picker, _ = a.picker.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+			}
+			return a, a.picker.Init()
+		}
 		var cmd tea.Cmd
 		a.viewpicker, cmd = a.viewpicker.Update(msg)
 		return a, cmd
@@ -447,7 +554,84 @@ func (a App) View() string {
 		return overlayCenter(baseView, confirmBox, a.width, a.height)
 	}
 
+	if a.loadErr != "" && a.state != ViewLoading {
+		color := lipgloss.Color("9")
+		if !strings.HasPrefix(a.loadErr, "⚠") && !strings.HasPrefix(a.loadErr, "Error") {
+			color = lipgloss.Color("10")
+		}
+		notice := lipgloss.NewStyle().Foreground(color).Render(a.loadErr)
+		if baseView == "" {
+			return notice
+		}
+		return baseView + "\n" + notice
+	}
+
 	return baseView
+}
+
+func backgroundRefreshCmd(client github.GitHubClient, owner string, number int) tea.Cmd {
+	return func() tea.Msg {
+		// Force memory cache clear so background refresh actually hits the API,
+		// not the warm in-memory cache from the initial disk-cache load.
+		if cc, ok := client.(*github.CachedClient); ok {
+			cc.InvalidateAll()
+		}
+
+		project, err := client.GetProject(owner, number)
+		if err != nil {
+			return backgroundRefreshMsg{err: err}
+		}
+
+		views, err := client.GetProjectViews(project.ID)
+		if err != nil {
+			return backgroundRefreshMsg{err: err}
+		}
+
+		items, err := client.GetProjectItems(project.ID)
+		if err != nil {
+			return backgroundRefreshMsg{err: err}
+		}
+
+		fields, err := client.GetProjectFields(project.ID)
+		if err != nil {
+			return backgroundRefreshMsg{err: err}
+		}
+
+		return backgroundRefreshMsg{project: project, views: views, items: items, fields: fields}
+	}
+}
+
+func hasWarmProjectCache(owner string, number int) bool {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return false
+	}
+
+	projectPath := filepath.Join(cacheDir, "gh-projects", "project:"+owner+":"+fmt.Sprint(number)+".json")
+	payload, err := os.ReadFile(projectPath)
+	if err != nil {
+		return false
+	}
+
+	var envelope struct {
+		Version int             `json:"version"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil || envelope.Version != appDiskCacheVersion {
+		return false
+	}
+
+	var projects []github.Project
+	if err := json.Unmarshal(envelope.Data, &projects); err != nil || len(projects) == 0 || projects[0].ID == "" {
+		return false
+	}
+
+	viewsPath := filepath.Join(cacheDir, "gh-projects", "views:"+projects[0].ID+".json")
+	if _, err := os.Stat(viewsPath); err != nil {
+		return false
+	}
+
+	return true
 }
 
 func overlayCenter(base, overlay string, width, height int) string {

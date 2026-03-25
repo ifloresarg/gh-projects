@@ -16,6 +16,8 @@ type KeyMap struct {
 	Settings  key.Binding
 	MoveLeft  key.Binding
 	MoveRight key.Binding
+	Projects  key.Binding
+	Owners    key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
@@ -32,4 +34,6 @@ var DefaultKeyMap = KeyMap{
 	Settings:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "settings")),
 	MoveLeft:  key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "move left")),
 	MoveRight: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "move right")),
+	Projects:  key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "switch project")),
+	Owners:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "switch owner")),
 }

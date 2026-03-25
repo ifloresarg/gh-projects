@@ -220,6 +220,9 @@ func (g *GraphQLClient) GetProjectItems(projectID string) ([]ProjectItem, error)
 											Color string
 										}
 									} `graphql:"labels(first: 10)"`
+									Comments struct {
+										TotalCount int `graphql:"totalCount"`
+									} `graphql:"comments"`
 									CreatedAt  time.Time
 									UpdatedAt  time.Time
 									Repository struct {
@@ -249,6 +252,9 @@ func (g *GraphQLClient) GetProjectItems(projectID string) ([]ProjectItem, error)
 											Name string
 										} `graphql:"... on User"`
 									}
+									Comments struct {
+										TotalCount int `graphql:"totalCount"`
+									} `graphql:"comments"`
 									URL        string
 									CreatedAt  time.Time
 									Repository struct {
@@ -334,19 +340,20 @@ func (g *GraphQLClient) GetProjectItems(projectID string) ([]ProjectItem, error)
 				}
 
 				issue := &Issue{
-					ID:        n.Content.Issue.ID,
-					Number:    n.Content.Issue.Number,
-					Title:     n.Content.Issue.Title,
-					Body:      n.Content.Issue.Body,
-					State:     n.Content.Issue.State,
-					IssueType: n.Content.Issue.IssueType.Name,
-					Author:    User{Login: n.Content.Issue.Author.Login, Name: n.Content.Issue.Author.User.Name},
-					Assignees: assignees,
-					Labels:    labels,
-					CreatedAt: n.Content.Issue.CreatedAt,
-					UpdatedAt: n.Content.Issue.UpdatedAt,
-					RepoOwner: n.Content.Issue.Repository.Owner.Login,
-					RepoName:  n.Content.Issue.Repository.Name,
+					ID:            n.Content.Issue.ID,
+					Number:        n.Content.Issue.Number,
+					Title:         n.Content.Issue.Title,
+					Body:          n.Content.Issue.Body,
+					State:         n.Content.Issue.State,
+					IssueType:     n.Content.Issue.IssueType.Name,
+					CommentsCount: n.Content.Issue.Comments.TotalCount,
+					Author:        User{Login: n.Content.Issue.Author.Login, Name: n.Content.Issue.Author.User.Name},
+					Assignees:     assignees,
+					Labels:        labels,
+					CreatedAt:     n.Content.Issue.CreatedAt,
+					UpdatedAt:     n.Content.Issue.UpdatedAt,
+					RepoOwner:     n.Content.Issue.Repository.Owner.Login,
+					RepoName:      n.Content.Issue.Repository.Name,
 				}
 				issue.LinkedPRs = linkedPRs
 
@@ -361,15 +368,16 @@ func (g *GraphQLClient) GetProjectItems(projectID string) ([]ProjectItem, error)
 				item.ContentNumber = issue.Number
 			} else if n.Content.PullRequest.ID != "" {
 				pr := &PullRequest{
-					ID:        n.Content.PullRequest.ID,
-					Number:    n.Content.PullRequest.Number,
-					Title:     n.Content.PullRequest.Title,
-					State:     n.Content.PullRequest.State,
-					Author:    User{Login: n.Content.PullRequest.Author.Login, Name: n.Content.PullRequest.Author.User.Name},
-					URL:       n.Content.PullRequest.URL,
-					CreatedAt: n.Content.PullRequest.CreatedAt,
-					RepoOwner: n.Content.PullRequest.Repository.Owner.Login,
-					RepoName:  n.Content.PullRequest.Repository.Name,
+					ID:            n.Content.PullRequest.ID,
+					Number:        n.Content.PullRequest.Number,
+					Title:         n.Content.PullRequest.Title,
+					State:         n.Content.PullRequest.State,
+					CommentsCount: n.Content.PullRequest.Comments.TotalCount,
+					Author:        User{Login: n.Content.PullRequest.Author.Login, Name: n.Content.PullRequest.Author.User.Name},
+					URL:           n.Content.PullRequest.URL,
+					CreatedAt:     n.Content.PullRequest.CreatedAt,
+					RepoOwner:     n.Content.PullRequest.Repository.Owner.Login,
+					RepoName:      n.Content.PullRequest.Repository.Name,
 				}
 
 				item.Title = pr.Title

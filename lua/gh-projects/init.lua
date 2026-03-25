@@ -49,6 +49,9 @@ function M.open_projects(args)
 	vim.bo[buf].bufhidden = "wipe"
 	vim.bo[buf].buflisted = false
 
+	-- Guard flag to prevent recursive close (shared by on_exit and WinLeave)
+	local closing = false
+
 	-- Build command
 	local cmd = M.config.binary
 
@@ -69,10 +72,26 @@ function M.open_projects(args)
 		term = true,
 		on_exit = function()
 			vim.schedule(function()
+				closing = true
 				if vim.api.nvim_win_is_valid(win) then
-					vim.api.nvim_win_close(win, true)
+					pcall(vim.api.nvim_win_close, win, true)
 				end
 			end)
+		end,
+	})
+
+	-- Close window when focus leaves it (prevents orphaned floating windows)
+	vim.api.nvim_create_autocmd("WinLeave", {
+		buffer = buf,
+		once = false,
+		callback = function()
+			if closing then
+				return
+			end
+			if vim.api.nvim_win_is_valid(win) then
+				closing = true
+				pcall(vim.api.nvim_win_close, win, true)
+			end
 		end,
 	})
 

@@ -43,8 +43,10 @@ func Card(item github.ProjectItem, focused bool, width int, showLabels bool) str
 	var assignees []string
 	var labels []string
 	var prBadges []string
+	var commentsCount int
 
 	if c, ok := item.Content.(*github.Issue); ok {
+		commentsCount = c.CommentsCount
 		for i, a := range c.Assignees {
 			if i >= 3 {
 				break
@@ -91,6 +93,8 @@ func Card(item github.ProjectItem, focused bool, width int, showLabels bool) str
 		if len(c.LinkedPRs) > 2 {
 			prBadges = append(prBadges, fmt.Sprintf("+%d", len(c.LinkedPRs)-2))
 		}
+	} else if c, ok := item.Content.(*github.PullRequest); ok {
+		commentsCount = c.CommentsCount
 	}
 
 	var typeBadge string
@@ -109,11 +113,19 @@ func Card(item github.ProjectItem, focused bool, width int, showLabels bool) str
 		typeBadge = lipgloss.NewStyle().Foreground(typeColor).Render("[" + item.TypeValue + "]")
 	}
 
+	var commentBadge string
+	if commentsCount > 0 {
+		commentBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(fmt.Sprintf("💬 %d", commentsCount))
+	}
+
 	var secondLine string
-	if typeBadge != "" || len(prBadges) > 0 || len(assignees) > 0 || len(labels) > 0 {
+	if typeBadge != "" || commentBadge != "" || len(prBadges) > 0 || len(assignees) > 0 || len(labels) > 0 {
 		var parts []string
 		if typeBadge != "" {
 			parts = append(parts, typeBadge)
+		}
+		if commentBadge != "" {
+			parts = append(parts, commentBadge)
 		}
 		if len(prBadges) > 0 {
 			parts = append(parts, strings.Join(prBadges, " "))

@@ -31,6 +31,8 @@ type moveResultMsg struct {
 
 type SwitchViewMsg struct{}
 
+type SwitchProjectMsg struct{}
+
 type column struct {
 	name   string
 	itemID string
@@ -415,6 +417,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		case "v":
 			return m, func() tea.Msg { return SwitchViewMsg{} }
+		case "p":
+			return m, func() tea.Msg { return SwitchProjectMsg{} }
 		case "esc":
 			m.selected = false
 			return m, nil

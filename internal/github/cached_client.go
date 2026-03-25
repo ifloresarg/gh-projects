@@ -11,6 +11,7 @@ import (
 // CachedClient wraps a GitHubClient with in-memory caching for read operations.
 type CachedClient struct {
 	inner       GitHubClient
+	diskCache   *cache.DiskCache
 	projects    *cache.Cache[[]Project]
 	items       *cache.Cache[[]ProjectItem]
 	fields      *cache.Cache[[]ProjectField]
@@ -26,10 +27,33 @@ type CachedClient struct {
 	allProjects *cache.Cache[[]Project]
 }
 
+func loadBoardCache[T any](diskCache *cache.DiskCache, key string, target *T) bool {
+	if diskCache == nil {
+		return false
+	}
+
+	err := diskCache.Load(key, target)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, cache.ErrCacheMiss) {
+		return false
+	}
+
+	return false
+}
+
+func saveBoardCache(diskCache *cache.DiskCache, key string, value any) {
+	if diskCache != nil {
+		_ = diskCache.Save(key, value)
+	}
+}
+
 // NewCachedClient creates a CachedClient wrapping inner with the given TTL.
-func NewCachedClient(inner GitHubClient, ttl time.Duration) *CachedClient {
+func NewCachedClient(inner GitHubClient, ttl time.Duration, diskCache *cache.DiskCache) *CachedClient {
 	return &CachedClient{
 		inner:       inner,
+		diskCache:   diskCache,
 		projects:    cache.New[[]Project](ttl),
 		items:       cache.New[[]ProjectItem](ttl),
 		fields:      cache.New[[]ProjectField](ttl),
@@ -61,6 +85,28 @@ func (c *CachedClient) InvalidateAll() {
 	c.viewerOrgs.InvalidateAll()
 	c.viewerLogin.InvalidateAll()
 	c.allProjects.InvalidateAll()
+	if c.diskCache != nil {
+		_ = c.diskCache.InvalidateAll()
+	}
+}
+
+// InvalidateMemory clears all in-memory caches without touching disk.
+// Used before background SWR refresh so API is actually called.
+func (c *CachedClient) InvalidateMemory() {
+	c.projects.InvalidateAll()
+	c.items.InvalidateAll()
+	c.fields.InvalidateAll()
+	c.views.InvalidateAll()
+	c.issues.InvalidateAll()
+	c.comments.InvalidateAll()
+	c.labels.InvalidateAll()
+	c.prs.InvalidateAll()
+	c.users.InvalidateAll()
+	c.issueTypes.InvalidateAll()
+	c.viewerOrgs.InvalidateAll()
+	c.viewerLogin.InvalidateAll()
+	c.allProjects.InvalidateAll()
+	// NOTE: intentionally does NOT call c.diskCache.InvalidateAll()
 }
 
 func (c *CachedClient) ListProjects(owner string) ([]Project, error) {
@@ -78,12 +124,26 @@ func (c *CachedClient) ListProjects(owner string) ([]Project, error) {
 
 func (c *CachedClient) GetProject(owner string, number int) (*Project, error) {
 	key := "project:" + owner + ":" + fmt.Sprint(number)
+	if val, ok := c.projects.Get(key); ok && len(val) > 0 {
+		project := val[0]
+		return &project, nil
+	}
+	var cached []Project
+	if loadBoardCache(c.diskCache, key, &cached) {
+		c.projects.Set(key, cached)
+		if len(cached) > 0 {
+			project := cached[0]
+			return &project, nil
+		}
+	}
 	result, err := c.inner.GetProject(owner, number)
 	if err != nil {
 		return nil, err
 	}
 	if result != nil {
-		c.projects.Set(key, []Project{*result})
+		cached := []Project{*result}
+		c.projects.Set(key, cached)
+		saveBoardCache(c.diskCache, key, cached)
 	}
 	return result, nil
 }
@@ -93,11 +153,17 @@ func (c *CachedClient) GetProjectItems(projectID string) ([]ProjectItem, error) 
 	if val, ok := c.items.Get(key); ok {
 		return val, nil
 	}
+	var cached []ProjectItem
+	if loadBoardCache(c.diskCache, key, &cached) {
+		c.items.Set(key, cached)
+		return cached, nil
+	}
 	result, err := c.inner.GetProjectItems(projectID)
 	if err != nil {
 		return nil, err
 	}
 	c.items.Set(key, result)
+	saveBoardCache(c.diskCache, key, result)
 	return result, nil
 }
 
@@ -106,11 +172,17 @@ func (c *CachedClient) GetProjectFields(projectID string) ([]ProjectField, error
 	if val, ok := c.fields.Get(key); ok {
 		return val, nil
 	}
+	var cached []ProjectField
+	if loadBoardCache(c.diskCache, key, &cached) {
+		c.fields.Set(key, cached)
+		return cached, nil
+	}
 	result, err := c.inner.GetProjectFields(projectID)
 	if err != nil {
 		return nil, err
 	}
 	c.fields.Set(key, result)
+	saveBoardCache(c.diskCache, key, result)
 	return result, nil
 }
 
@@ -119,11 +191,17 @@ func (c *CachedClient) GetProjectViews(projectID string) ([]ProjectView, error) 
 	if val, ok := c.views.Get(key); ok {
 		return val, nil
 	}
+	var cached []ProjectView
+	if loadBoardCache(c.diskCache, key, &cached) {
+		c.views.Set(key, cached)
+		return cached, nil
+	}
 	result, err := c.inner.GetProjectViews(projectID)
 	if err != nil {
 		return nil, err
 	}
 	c.views.Set(key, result)
+	saveBoardCache(c.diskCache, key, result)
 	return result, nil
 }
 

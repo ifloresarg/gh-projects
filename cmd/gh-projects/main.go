@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/ifloresarg/gh-projects/internal/cache"
 	"github.com/ifloresarg/gh-projects/internal/config"
 	"github.com/ifloresarg/gh-projects/internal/github"
 	"github.com/ifloresarg/gh-projects/internal/tui"
@@ -48,7 +50,11 @@ func main() {
 	}
 
 	cacheTTL := time.Duration(cfg.CacheTTL) * time.Second
-	client := github.NewCachedClient(rawClient, cacheTTL)
+	var diskCache *cache.DiskCache
+	if cacheDir, err := os.UserCacheDir(); err == nil {
+		diskCache, _ = cache.NewDiskCache(filepath.Join(cacheDir, "gh-projects"))
+	}
+	client := github.NewCachedClient(rawClient, cacheTTL, diskCache)
 
 	app := tui.NewApp(cfg, client)
 	if *owner != "" && *number != 0 {

@@ -321,6 +321,68 @@ func TestCardViewNoPRBadgeForPullRequestItems(t *testing.T) {
 	}
 }
 
+func TestCardCommentCount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("issue with comments shows badge", func(t *testing.T) {
+		t.Parallel()
+
+		view := Card(github.ProjectItem{
+			Title:         "Issue with comments",
+			Type:          "Issue",
+			ContentNumber: 7,
+			Content: &github.Issue{
+				Number:        7,
+				CommentsCount: 5,
+			},
+		}, false, 35, true)
+
+		for _, fragment := range []string{"💬", "5"} {
+			if !strings.Contains(view, fragment) {
+				t.Fatalf("Card() view missing %q in %q", fragment, view)
+			}
+		}
+	})
+
+	t.Run("issue without comments hides badge", func(t *testing.T) {
+		t.Parallel()
+
+		view := Card(github.ProjectItem{
+			Title:         "Quiet issue",
+			Type:          "Issue",
+			ContentNumber: 8,
+			Content: &github.Issue{
+				Number:        8,
+				CommentsCount: 0,
+			},
+		}, false, 35, true)
+
+		if strings.Contains(view, "💬") {
+			t.Fatalf("Card() view unexpectedly included comment badge in %q", view)
+		}
+	})
+
+	t.Run("pull request with comments shows badge", func(t *testing.T) {
+		t.Parallel()
+
+		view := Card(github.ProjectItem{
+			Title:         "Discussed pull request",
+			Type:          "PullRequest",
+			ContentNumber: 9,
+			Content: &github.PullRequest{
+				Number:        9,
+				CommentsCount: 3,
+			},
+		}, false, 35, true)
+
+		for _, fragment := range []string{"💬", "3"} {
+			if !strings.Contains(view, fragment) {
+				t.Fatalf("Card() view missing %q in %q", fragment, view)
+			}
+		}
+	})
+}
+
 func TestCardViewMultiplePRBadgesWithOverflow(t *testing.T) {
 	t.Parallel()
 

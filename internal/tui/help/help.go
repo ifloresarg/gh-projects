@@ -73,6 +73,17 @@ func (m Model) View() string {
 				"  < / >     Move card left / right",
 				"  /         Search / filter",
 				"  s         Settings",
+				"  v         Switch view",
+				"  p         Switch project",
+			},
+		},
+		{
+			title: "Picker",
+			items: []string{
+				"  j / k     Move between projects",
+				"  Enter     Select project",
+				"  /         Search",
+				"  o         Switch owner",
 			},
 		},
 		{
