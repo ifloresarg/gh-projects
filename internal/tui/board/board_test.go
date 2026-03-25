@@ -1091,3 +1091,193 @@ func TestBoardFooterContainsSettingsHint(t *testing.T) {
 		t.Errorf("expected footer to contain 's Settings', got:\n%s", view)
 	}
 }
+
+func TestApplyViewFilter_RepoAndLabelFilters(t *testing.T) {
+	t.Parallel()
+
+	// Set up test data: items from multiple repos, various labels, PR and DraftIssue
+	fields := testBoardFields()
+	items := []github.ProjectItem{
+		// Issue with safe label
+		{ID: "1", Title: "Issue1", Type: "Issue", StatusID: "todo", RepoOwner: "org", RepoName: "safe",
+			Content: &github.Issue{Title: "Issue1", Number: 1, Labels: []github.Label{{Name: "bug"}}}},
+		// Issue with excluded label "marketing"
+		{ID: "2", Title: "Issue2", Type: "Issue", StatusID: "doing", RepoOwner: "org", RepoName: "safe",
+			Content: &github.Issue{Title: "Issue2", Number: 2, Labels: []github.Label{{Name: "marketing"}}}},
+		// Issue with excluded label "design"
+		{ID: "3", Title: "Issue3", Type: "Issue", StatusID: "doing", RepoOwner: "org", RepoName: "safe",
+			Content: &github.Issue{Title: "Issue3", Number: 3, Labels: []github.Label{{Name: "design"}}}},
+		// Issue in excluded repo
+		{ID: "4", Title: "Issue4", Type: "Issue", StatusID: "done", RepoOwner: "org", RepoName: "excluded",
+			Content: &github.Issue{Title: "Issue4", Number: 4, Labels: []github.Label{{Name: "bug"}}}},
+		// PR (should be excluded when any label filter is active)
+		{ID: "5", Title: "PR1", Type: "PullRequest", StatusID: "done", RepoOwner: "org", RepoName: "safe",
+			Content: &github.PullRequest{Title: "PR1", Number: 55}},
+		// DraftIssue (should always pass through)
+		{ID: "6", Title: "Draft1", Type: "DraftIssue", StatusID: "todo", Content: nil},
+	}
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: items, fields: fields})
+
+	// Set active view with status, repo, and label filters
+	m.activeView = &github.ProjectView{Filter: "-status:Backlog -repo:org/excluded -label:marketing -label:design"}
+	m.applyViewFilter()
+
+	// Assert: "Backlog" column is removed (if it existed, but with testBoardFields it doesn't, so just verify no Backlog)
+	columnNames := make(map[string]bool)
+	for _, col := range m.viewColumns {
+		columnNames[col.name] = true
+	}
+	if columnNames["Backlog"] {
+		t.Errorf("applyViewFilter() unexpectedly kept 'Backlog' column")
+	}
+
+	// Flatten all items from remaining columns
+	var allItems []github.ProjectItem
+	for _, col := range m.viewColumns {
+		allItems = append(allItems, col.items...)
+	}
+
+	// Assert: Items from excluded repo are not present
+	for _, item := range allItems {
+		if item.RepoOwner == "org" && item.RepoName == "excluded" {
+			t.Errorf("applyViewFilter() unexpectedly kept item from excluded repo: %#v", item)
+		}
+	}
+
+	// Assert: Items with excluded labels are not present (except DraftIssue)
+	for _, item := range allItems {
+		if item.Type == "Issue" && item.Content != nil {
+			if issue, ok := item.Content.(*github.Issue); ok {
+				for _, label := range issue.Labels {
+					if strings.EqualFold(label.Name, "marketing") || strings.EqualFold(label.Name, "design") {
+						t.Errorf("applyViewFilter() unexpectedly kept item with excluded label: %#v", item)
+					}
+				}
+			}
+		}
+	}
+
+	// Assert: PRs are excluded when label filter is active
+	for _, item := range allItems {
+		if item.Type == "PullRequest" {
+			t.Errorf("applyViewFilter() unexpectedly kept PR when label filter is active: %#v", item)
+		}
+	}
+
+	// Assert: DraftIssue is preserved
+	hasDraft := false
+	for _, item := range allItems {
+		if item.Type == "DraftIssue" && item.Title == "Draft1" {
+			hasDraft = true
+			break
+		}
+	}
+	if !hasDraft {
+		t.Errorf("applyViewFilter() unexpectedly removed DraftIssue")
+	}
+
+	// Assert: Issue1 (with bug label in safe repo) is preserved
+	hasIssue1 := false
+	for _, item := range allItems {
+		if item.ID == "1" {
+			hasIssue1 = true
+			break
+		}
+	}
+	if !hasIssue1 {
+		t.Errorf("applyViewFilter() unexpectedly removed Issue1 (should pass filters)")
+	}
+}
+
+func TestApplyViewFilter_StatusOnlyRegression(t *testing.T) {
+	t.Parallel()
+
+	fields := testBoardFields()
+	items := []github.ProjectItem{
+		{ID: "1", Title: "Item1", Type: "Issue", StatusID: "todo",
+			Content: &github.Issue{Title: "Item1", Number: 1}},
+		{ID: "2", Title: "Item2", Type: "Issue", StatusID: "doing",
+			Content: &github.Issue{Title: "Item2", Number: 2}},
+		{ID: "3", Title: "Item3", Type: "Issue", StatusID: "done",
+			Content: &github.Issue{Title: "Item3", Number: 3}},
+	}
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: items, fields: fields})
+
+	// Store original column/item counts
+	origColCount := len(m.allColumns)
+	origItemCount := 0
+	for _, col := range m.allColumns {
+		origItemCount += len(col.items)
+	}
+
+	// Set active view with status-only filter (no repo/label)
+	m.activeView = &github.ProjectView{Filter: "-status:Backlog"}
+	m.applyViewFilter()
+
+	// Assert: no columns were removed (Backlog doesn't exist in testBoardFields)
+	if len(m.viewColumns) != origColCount {
+		t.Errorf("applyViewFilter() changed column count from %d to %d for status-only filter",
+			origColCount, len(m.viewColumns))
+	}
+
+	// Assert: all items in remaining columns are preserved
+	viewItemCount := 0
+	for _, col := range m.viewColumns {
+		viewItemCount += len(col.items)
+	}
+	if viewItemCount != origItemCount {
+		t.Errorf("applyViewFilter() changed item count from %d to %d for status-only filter",
+			origItemCount, viewItemCount)
+	}
+}
+
+func TestApplyViewFilter_NoFilter(t *testing.T) {
+	t.Parallel()
+
+	fields := testBoardFields()
+	items := []github.ProjectItem{
+		{ID: "1", Title: "Item1", Type: "Issue", StatusID: "todo",
+			Content: &github.Issue{Title: "Item1", Number: 1}},
+		{ID: "2", Title: "Item2", Type: "Issue", StatusID: "doing",
+			Content: &github.Issue{Title: "Item2", Number: 2}},
+		{ID: "3", Title: "Item3", Type: "Issue", StatusID: "done",
+			Content: &github.Issue{Title: "Item3", Number: 3}},
+	}
+
+	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: items, fields: fields})
+
+	// Store original counts
+	origColCount := len(m.allColumns)
+	origItemCount := 0
+	for _, col := range m.allColumns {
+		origItemCount += len(col.items)
+	}
+
+	// Set activeView to nil (no filter at all)
+	m.activeView = nil
+	m.applyViewFilter()
+
+	// Assert: all columns preserved
+	if len(m.viewColumns) != origColCount {
+		t.Errorf("applyViewFilter() with nil activeView: expected %d columns, got %d",
+			origColCount, len(m.viewColumns))
+	}
+
+	// Assert: all items preserved
+	viewItemCount := 0
+	for _, col := range m.viewColumns {
+		viewItemCount += len(col.items)
+	}
+	if viewItemCount != origItemCount {
+		t.Errorf("applyViewFilter() with nil activeView: expected %d items, got %d",
+			origItemCount, viewItemCount)
+	}
+}

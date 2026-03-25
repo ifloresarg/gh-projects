@@ -949,6 +949,16 @@ func (m *Model) applyViewFilter() {
 
 	excluded := ParseStatusFilter(m.activeView.Filter)
 	m.viewColumns = FilterColumns(m.allColumns, excluded)
+
+	excludedRepos := ParseRepoFilter(m.activeView.Filter)
+	excludedLabels := ParseLabelFilter(m.activeView.Filter)
+	if len(excludedRepos) > 0 || len(excludedLabels) > 0 {
+		for i := range m.viewColumns {
+			m.viewColumns[i].items = FilterItemsByRepoAndLabel(
+				m.viewColumns[i].items, excludedRepos, excludedLabels,
+			)
+		}
+	}
 }
 
 func (m *Model) SetActiveView(view *github.ProjectView) {

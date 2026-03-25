@@ -2,6 +2,8 @@ package board
 
 import (
 	"testing"
+
+	github "github.com/ifloresarg/gh-projects/internal/github"
 )
 
 // ParseStatusFilter tests
@@ -148,7 +150,196 @@ func TestFilterColumns_EmptyExclusions(t *testing.T) {
 	}
 }
 
-// Helper function for test assertions
+// ParseRepoFilter tests
+
+func TestParseRepoFilter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		filter string
+		want   []string
+	}{
+		{name: "empty", filter: "", want: nil},
+		{name: "no repo clause", filter: "-is:closed", want: nil},
+		{name: "single repo", filter: "-repo:hifihub/hh-scraping", want: []string{"hifihub/hh-scraping"}},
+		{name: "multiple repos", filter: "-repo:org/repo-a -repo:org/repo-b", want: []string{"org/repo-a", "org/repo-b"}},
+		{name: "mixed with other filters", filter: "-status:Backlog -repo:org/repo -label:marketing", want: []string{"org/repo"}},
+		{name: "repo with closed filter", filter: "-repo:org/repo -is:closed", want: []string{"org/repo"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseRepoFilter(tt.filter)
+			if !sliceEqual(got, tt.want) {
+				t.Fatalf("ParseRepoFilter(%q) = %v, want %v", tt.filter, got, tt.want)
+			}
+		})
+	}
+}
+
+// ParseLabelFilter tests
+
+func TestParseLabelFilter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		filter string
+		want   []string
+	}{
+		{name: "empty", filter: "", want: nil},
+		{name: "no label clause", filter: "-is:closed", want: nil},
+		{name: "single label", filter: "-label:marketing", want: []string{"marketing"}},
+		{name: "multiple labels", filter: "-label:marketing -label:design", want: []string{"marketing", "design"}},
+		{name: "quoted label", filter: "-label:\"bug fix\"", want: []string{"bug fix"}},
+		{name: "mixed with other filters", filter: "-status:Backlog -label:marketing -repo:a/b", want: []string{"marketing"}},
+		{name: "multiple labels with quoted", filter: "-label:marketing -label:\"bug fix\" -label:design", want: []string{"marketing", "bug fix", "design"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseLabelFilter(tt.filter)
+			if !sliceEqual(got, tt.want) {
+				t.Fatalf("ParseLabelFilter(%q) = %v, want %v", tt.filter, got, tt.want)
+			}
+		})
+	}
+}
+
+// FilterItemsByRepoAndLabel tests
+
+func TestFilterItemsByRepoAndLabel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		items          []github.ProjectItem
+		excludedRepos  []string
+		excludedLabels []string
+		expectedLen    int
+		expectedTitles []string
+	}{
+		{
+			name: "no filters",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Issue 1", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{}}},
+				{ID: "2", Title: "PR 1", Type: "PullRequest", RepoOwner: "org", RepoName: "repo", Content: &github.PullRequest{}},
+				{ID: "3", Title: "Draft 1", Type: "DraftIssue", RepoOwner: "", RepoName: "", Content: nil},
+			},
+			excludedRepos:  nil,
+			excludedLabels: nil,
+			expectedLen:    3,
+			expectedTitles: []string{"Issue 1", "PR 1", "Draft 1"},
+		},
+		{
+			name: "repo exclusion",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Excluded issue", Type: "Issue", RepoOwner: "org", RepoName: "excluded", Content: &github.Issue{Labels: []github.Label{}}},
+				{ID: "2", Title: "Kept issue", Type: "Issue", RepoOwner: "org", RepoName: "kept", Content: &github.Issue{Labels: []github.Label{}}},
+			},
+			excludedRepos:  []string{"org/excluded"},
+			excludedLabels: nil,
+			expectedLen:    1,
+			expectedTitles: []string{"Kept issue"},
+		},
+		{
+			name: "label exclusion",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Marketing issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "marketing"}}}},
+				{ID: "2", Title: "Bug issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "bug"}}}},
+			},
+			excludedRepos:  nil,
+			excludedLabels: []string{"marketing"},
+			expectedLen:    1,
+			expectedTitles: []string{"Bug issue"},
+		},
+		{
+			name: "label case insensitive",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Capital marketing", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "Marketing"}}}},
+				{ID: "2", Title: "Lowercase marketing", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "marketing"}}}},
+			},
+			excludedRepos:  nil,
+			excludedLabels: []string{"marketing"},
+			expectedLen:    0,
+			expectedTitles: []string{},
+		},
+		{
+			name: "PR filtered when label active",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "PR without labels", Type: "PullRequest", RepoOwner: "org", RepoName: "repo", Content: &github.PullRequest{}},
+			},
+			excludedRepos:  nil,
+			excludedLabels: []string{"marketing"},
+			expectedLen:    0,
+			expectedTitles: []string{},
+		},
+		{
+			name: "DraftIssue passes through",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Draft item", Type: "DraftIssue", RepoOwner: "", RepoName: "", Content: nil},
+			},
+			excludedRepos:  nil,
+			excludedLabels: []string{"marketing"},
+			expectedLen:    1,
+			expectedTitles: []string{"Draft item"},
+		},
+		{
+			name: "combined repo and label",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Excluded repo", Type: "Issue", RepoOwner: "org", RepoName: "excluded", Content: &github.Issue{Labels: []github.Label{}}},
+				{ID: "2", Title: "Marketing label", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "marketing"}}}},
+				{ID: "3", Title: "Clean issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "bug"}}}},
+			},
+			excludedRepos:  []string{"org/excluded"},
+			excludedLabels: []string{"marketing"},
+			expectedLen:    1,
+			expectedTitles: []string{"Clean issue"},
+		},
+		{
+			name:           "empty items list",
+			items:          []github.ProjectItem{},
+			excludedRepos:  []string{"org/excluded"},
+			excludedLabels: []string{"marketing"},
+			expectedLen:    0,
+			expectedTitles: []string{},
+		},
+		{
+			name: "multiple label exclusions",
+			items: []github.ProjectItem{
+				{ID: "1", Title: "Marketing issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "marketing"}}}},
+				{ID: "2", Title: "Design issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "design"}}}},
+				{ID: "3", Title: "Bug issue", Type: "Issue", RepoOwner: "org", RepoName: "repo", Content: &github.Issue{Labels: []github.Label{{Name: "bug"}}}},
+			},
+			excludedRepos:  nil,
+			excludedLabels: []string{"marketing", "design"},
+			expectedLen:    1,
+			expectedTitles: []string{"Bug issue"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FilterItemsByRepoAndLabel(tt.items, tt.excludedRepos, tt.excludedLabels)
+
+			if len(got) != tt.expectedLen {
+				t.Fatalf("FilterItemsByRepoAndLabel returned %d items, want %d", len(got), tt.expectedLen)
+			}
+
+			gotTitles := make([]string, len(got))
+			for i, item := range got {
+				gotTitles[i] = item.Title
+			}
+
+			if !sliceEqual(gotTitles, tt.expectedTitles) {
+				t.Errorf("FilterItemsByRepoAndLabel titles = %v, want %v", gotTitles, tt.expectedTitles)
+			}
+		})
+	}
+}
+
+// sliceEqual compares two string slices for equality.
 func sliceEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
