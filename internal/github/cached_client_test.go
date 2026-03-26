@@ -280,6 +280,47 @@ func TestCachedClientListAssignableUsersMutationInvalidatesCache(t *testing.T) {
 	}
 }
 
+func TestCachedClientUpdateIssueBodyInvalidatesReadCachesAfterSuccessfulMutation(t *testing.T) {
+	t.Parallel()
+
+	listCalls := 0
+	updateCalls := 0
+	client := NewCachedClient(&MockClient{
+		ListProjectsFn: func(owner string) ([]Project, error) {
+			listCalls++
+			return []Project{{ID: "p1", Title: "Roadmap", Owner: owner}}, nil
+		},
+		UpdateIssueBodyFn: func(issueID string, body string) error {
+			updateCalls++
+			return nil
+		},
+	}, time.Minute, nil)
+
+	if _, err := client.ListProjects("octocat"); err != nil {
+		t.Fatalf("ListProjects() initial call error = %v", err)
+	}
+	if _, err := client.ListProjects("octocat"); err != nil {
+		t.Fatalf("ListProjects() cached call error = %v", err)
+	}
+	if listCalls != 1 {
+		t.Fatalf("ListProjects() inner call count before mutation = %d, want 1", listCalls)
+	}
+
+	if err := client.UpdateIssueBody("I_123", "new body"); err != nil {
+		t.Fatalf("UpdateIssueBody() error = %v", err)
+	}
+	if updateCalls != 1 {
+		t.Fatalf("UpdateIssueBody() inner call count = %d, want 1", updateCalls)
+	}
+
+	if _, err := client.ListProjects("octocat"); err != nil {
+		t.Fatalf("ListProjects() after invalidation error = %v", err)
+	}
+	if listCalls != 2 {
+		t.Fatalf("ListProjects() inner call count after invalidation = %d, want 2", listCalls)
+	}
+}
+
 func TestCachedClientListViewerOrganizationsCachesResult(t *testing.T) {
 	t.Parallel()
 

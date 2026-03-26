@@ -27,6 +27,7 @@ type MockClient struct {
 	AddLabelFn                   func(owner, repo string, number int, labelName string) error
 	RemoveLabelFn                func(owner, repo string, number int, labelID string) error
 	UpdateIssueTypeFn            func(issueID string, typeID *string) error
+	UpdateIssueBodyFn            func(issueID string, body string) error
 	CloseIssueFn                 func(owner, repo string, number int) error
 	ReopenIssueFn                func(owner, repo string, number int) error
 	LinkPRToIssueFunc            func(owner, repo string, prNumber, issueNumber int) error
@@ -349,6 +350,14 @@ func (m *MockClient) RemoveLabel(owner, repo string, number int, labelID string)
 func (m *MockClient) UpdateIssueType(issueID string, typeID *string) error {
 	if m.UpdateIssueTypeFn != nil {
 		return m.UpdateIssueTypeFn(issueID, typeID)
+	}
+
+	return nil
+}
+
+func (m *MockClient) UpdateIssueBody(issueID string, body string) error {
+	if m.UpdateIssueBodyFn != nil {
+		return m.UpdateIssueBodyFn(issueID, body)
 	}
 
 	return nil

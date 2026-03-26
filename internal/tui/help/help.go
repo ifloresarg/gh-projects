@@ -92,6 +92,7 @@ func (m Model) View() string {
 				"  c         Comments",
 				"  a         Assign / Unassign",
 				"  L         Add / Remove Labels",
+				"  e         Edit body",
 				"  x         Close issue",
 				"  X         Reopen issue",
 				"  p         Link PR to project",

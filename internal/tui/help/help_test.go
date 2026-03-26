@@ -61,3 +61,15 @@ func TestHelpViewContainsSettingsKeybinding(t *testing.T) {
 		t.Errorf("expected help view to contain 'Settings', got:\n%s", view)
 	}
 }
+
+func TestHelpViewContainsEditBodyKeybinding(t *testing.T) {
+	t.Parallel()
+
+	m := New(80, 24)
+	m.Show()
+
+	view := m.View()
+	if !strings.Contains(view, "  e         Edit body") {
+		t.Fatalf("expected help view to contain edit body keybinding, got:\n%s", view)
+	}
+}

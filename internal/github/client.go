@@ -25,6 +25,7 @@ type GitHubClient interface {
 	AddLabel(owner, repo string, number int, labelName string) error
 	RemoveLabel(owner, repo string, number int, labelID string) error
 	UpdateIssueType(issueID string, typeID *string) error
+	UpdateIssueBody(issueID string, body string) error
 	CloseIssue(owner, repo string, number int) error
 	ReopenIssue(owner, repo string, number int) error
 	LinkPRToIssue(owner, repo string, prNumber, issueNumber int) error

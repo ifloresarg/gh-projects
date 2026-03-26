@@ -2,6 +2,7 @@ package detail
 
 import (
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/ifloresarg/gh-projects/internal/editor"
 	"github.com/ifloresarg/gh-projects/internal/github"
 )
 
@@ -42,6 +44,12 @@ type linkPRResultMsg struct {
 	err      error
 }
 
+type editBodyResultMsg struct {
+	body    string
+	changed bool
+	err     error
+}
+
 type Model struct {
 	client        github.GitHubClient
 	item          github.ProjectItem
@@ -64,6 +72,7 @@ type Model struct {
 	showComments  bool
 	showAddPR     bool
 	showPRPicker  bool
+	editingBody   bool
 	width         int
 	height        int
 	confirming    bool
@@ -374,6 +383,29 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.viewport.SetContent(m.renderIssueContent())
 		}
 		return m, nil
+	case editBodyResultMsg:
+		m.editingBody = false
+		if msg.err != nil {
+			m.opMsg = "Error: " + msg.err.Error()
+			return m, nil
+		}
+		if !msg.changed {
+			m.opMsg = "No changes made"
+			return m, nil
+		}
+
+		if m.issue == nil {
+			m.opMsg = "Error: issue unavailable"
+			return m, nil
+		}
+
+		m.issue.Body = msg.body
+		if issue, ok := m.item.Content.(*github.Issue); ok && issue != nil {
+			issue.Body = msg.body
+		}
+		m.viewport.SetContent(m.renderIssueContent())
+		m.opMsg = fmt.Sprintf("Issue #%d body updated", m.issue.Number)
+		return m, nil
 	case tea.KeyMsg:
 		if m.confirming {
 			switch msg.String() {
@@ -502,6 +534,47 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.issueType = newIssueTypeModel(m.client, m.issue, m.width, m.height)
 			m.showIssueType = true
 			return m, m.issueType.Init()
+		case "e":
+			if m.showAssign || m.showLabels || m.showComments || m.showIssueType || m.showAddPR || m.showPRPicker {
+				return m, nil
+			}
+			if m.item.Type != "Issue" {
+				if m.item.Type == "PullRequest" {
+					m.opHint = "PR detail: use GitHub web"
+				} else {
+					m.opHint = "Draft items are read-only"
+				}
+				return m, nil
+			}
+			if m.loading {
+				m.opHint = "Issue still loading"
+				return m, nil
+			}
+			if m.issue == nil {
+				m.opHint = "Issue detail unavailable"
+				return m, nil
+			}
+
+			editorBin, err := editor.ResolveEditor()
+			if err != nil {
+				m.opMsg = "Error: " + err.Error()
+				return m, nil
+			}
+
+			tmpPath, cleanup, err := editor.PrepareEdit(m.issue.Body)
+			if err != nil {
+				m.opMsg = "Error: " + err.Error()
+				return m, nil
+			}
+
+			m.editingBody = true
+			m.opMsg = ""
+			return m, tea.ExecProcess(
+				exec.Command(editorBin, tmpPath),
+				func(err error) tea.Msg {
+					return m.editBodyExecResult(err, tmpPath, m.issue.Body, cleanup)
+				},
+			)
 		case "c", "a", "L":
 			if m.item.Type != "Issue" {
 				if m.item.Type == "PullRequest" {
@@ -567,6 +640,37 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, tea.Batch(commentsCmd, cmd)
 	}
 	return m, cmd
+}
+
+func (m Model) editBodyExecResult(execErr error, tmpPath, originalBody string, cleanup func()) tea.Msg {
+	if execErr != nil {
+		cleanup()
+		return editBodyResultMsg{err: fmt.Errorf("editor exited with error: %w", execErr)}
+	}
+
+	newBody, changed, err := editor.ReadResult(tmpPath, originalBody)
+	if err != nil {
+		cleanup()
+		return editBodyResultMsg{err: err}
+	}
+
+	if !changed {
+		cleanup()
+		return editBodyResultMsg{body: originalBody, changed: false}
+	}
+
+	if m.issue == nil {
+		cleanup()
+		return editBodyResultMsg{err: fmt.Errorf("issue unavailable")}
+	}
+
+	err = m.client.UpdateIssueBody(m.issue.ID, newBody)
+	if err != nil {
+		return editBodyResultMsg{err: fmt.Errorf("%w (your edits are saved at %s)", err, tmpPath)}
+	}
+
+	cleanup()
+	return editBodyResultMsg{body: newBody, changed: true}
 }
 
 func (m Model) closeIssueCmd() tea.Cmd {
