@@ -100,8 +100,8 @@ return {
   config = function()
     require("gh-projects").setup({
       binary = "gh projects",
-      width = 0.8,
-      height = 0.8,
+      width = 0.9,
+      height = 0.95,
       border = "rounded",
     })
   end,

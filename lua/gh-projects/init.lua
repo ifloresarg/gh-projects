@@ -3,8 +3,8 @@ local M = {}
 -- Default configuration
 M.config = {
 	binary = "gh projects",
-	width = 0.8,
-	height = 0.8,
+	width = 0.9,
+	height = 0.95,
 	border = "rounded",
 }
 
