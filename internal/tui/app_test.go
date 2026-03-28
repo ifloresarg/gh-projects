@@ -125,101 +125,24 @@ func TestAppSetupCompleteTransitionsToPicker(t *testing.T) {
 	}
 }
 
-func TestAppQuitConfirmationFlow(t *testing.T) {
+func TestAppQuitKeys(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
-		name            string
-		app             App
-		msg             tea.KeyMsg
-		wantQuitConfirm bool
-		wantQuit        bool
+		name string
+		msg  tea.KeyMsg
 	}{
-		{
-			name:            "q sets confirmation without quitting",
-			app:             NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{}),
-			msg:             tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}},
-			wantQuitConfirm: true,
-		},
-		{
-			name:            "y quits when confirming",
-			app:             App{quitConfirm: true},
-			msg:             tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}},
-			wantQuitConfirm: true,
-			wantQuit:        true,
-		},
-		{
-			name:            "n cancels confirmation",
-			app:             App{quitConfirm: true},
-			msg:             tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}},
-			wantQuitConfirm: false,
-		},
-		{
-			name:            "ctrl+c quits immediately",
-			app:             NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{}),
-			msg:             tea.KeyMsg{Type: tea.KeyCtrlC},
-			wantQuitConfirm: false,
-			wantQuit:        true,
-		},
-		{
-			name:            "ctrl+c quits immediately while confirming",
-			app:             App{quitConfirm: true},
-			msg:             tea.KeyMsg{Type: tea.KeyCtrlC},
-			wantQuitConfirm: true,
-			wantQuit:        true,
-		},
+		{"q quits immediately", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}},
+		{"ctrl+c quits immediately", tea.KeyMsg{Type: tea.KeyCtrlC}},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			model, cmd := tt.app.Update(tt.msg)
-			updated := model.(App)
-
-			if updated.quitConfirm != tt.wantQuitConfirm {
-				t.Fatalf("quitConfirm = %v, want %v", updated.quitConfirm, tt.wantQuitConfirm)
-			}
-
-			if gotQuit := isQuitCmd(cmd); gotQuit != tt.wantQuit {
-				t.Fatalf("isQuitCmd(cmd) = %v, want %v", gotQuit, tt.wantQuit)
+			app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
+			_, cmd := app.Update(tt.msg)
+			if !isQuitCmd(cmd) {
+				t.Fatalf("isQuitCmd(cmd) = false, want true")
 			}
 		})
-	}
-}
-
-func TestAppViewShowsQuitConfirmationOverlay(t *testing.T) {
-	t.Parallel()
-
-	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
-	app.quitConfirm = true
-
-	view := app.View()
-	if !strings.Contains(view, "Quit? (y/n)") {
-		t.Fatalf("View() = %q, want quit confirmation overlay", view)
-	}
-}
-
-func TestAppQuitConfirmationSwallowsOtherKeys(t *testing.T) {
-	t.Parallel()
-
-	app := NewApp(config.Config{DefaultOwner: "octocat"}, &github.MockClient{})
-	app.quitConfirm = true
-	app.help.Hide()
-
-	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
-	updated := model.(App)
-
-	if !updated.quitConfirm {
-		t.Fatal("quitConfirm = false, want true")
-	}
-
-	if updated.help.IsVisible() {
-		t.Fatal("help overlay became visible while quit confirmation was active")
-	}
-
-	if cmd != nil {
-		t.Fatalf("cmd = %v, want nil", cmd)
 	}
 }
 

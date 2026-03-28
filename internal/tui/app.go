@@ -37,7 +37,6 @@ type App struct {
 	config           config.Config
 	client           github.GitHubClient
 	state            ViewState
-	quitConfirm      bool
 	loadErr          string
 	setup            setup.Model
 	picker           picker.Model
@@ -371,21 +370,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		}
 
-		if a.quitConfirm {
-			switch msg.String() {
-			case "y":
-				return a, tea.Quit
-			case "n", "esc":
-				a.quitConfirm = false
-				return a, nil
-			}
-			return a, nil
-		}
-
 		switch {
 		case msg.String() == "q":
-			a.quitConfirm = true
-			return a, nil
+			return a, tea.Quit
 		case key.Matches(msg, a.keys.Help):
 			a.help.Show()
 			return a, nil
@@ -535,25 +522,6 @@ func (a App) View() string {
 		return a.help.View()
 	}
 
-	if a.quitConfirm {
-		confirmBox := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("8")).
-			Foreground(lipgloss.Color("3")).
-			Background(lipgloss.Color("235")).
-			Padding(0, 1).
-			Render("Quit? (y/n)")
-
-		if a.width <= 0 || a.height <= 0 {
-			if baseView == "" {
-				return confirmBox
-			}
-			return baseView + "\n" + confirmBox
-		}
-
-		return overlayCenter(baseView, confirmBox, a.width, a.height)
-	}
-
 	if a.loadErr != "" && a.state != ViewLoading {
 		color := lipgloss.Color("9")
 		if !strings.HasPrefix(a.loadErr, "⚠") && !strings.HasPrefix(a.loadErr, "Error") {
@@ -632,21 +600,4 @@ func hasWarmProjectCache(owner string, number int) bool {
 	}
 
 	return true
-}
-
-func overlayCenter(base, overlay string, width, height int) string {
-	baseLines := strings.Split(lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, base), "\n")
-	overlayLines := strings.Split(overlay, "\n")
-
-	startRow := max(0, (len(baseLines)-len(overlayLines))/2)
-	for i, overlayLine := range overlayLines {
-		row := startRow + i
-		if row >= len(baseLines) {
-			break
-		}
-
-		baseLines[row] = lipgloss.PlaceHorizontal(width, lipgloss.Center, overlayLine)
-	}
-
-	return strings.Join(baseLines, "\n")
 }
