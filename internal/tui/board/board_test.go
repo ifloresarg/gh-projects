@@ -845,20 +845,30 @@ func TestClosedItemsFilteredWhenShowClosedItemsFalse(t *testing.T) {
 	}
 }
 
-func TestSearchInputStyle(t *testing.T) {
+func TestSearchBarVisibleInView(t *testing.T) {
 	t.Parallel()
 
 	m := New(&github.MockClient{}, github.Project{ID: "PVT_1", Title: "Roadmap"})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m, _ = m.Update(boardLoadedMsg{items: testBoardItems(), fields: testBoardFields()})
 
-	textStyleRender := m.searchInput.TextStyle.Render("test")
-	promptStyleRender := m.searchInput.PromptStyle.Render("test")
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 
-	if textStyleRender == "" {
-		t.Fatalf("TextStyle render result is empty")
+	for _, ch := range "cache" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 	}
 
-	if promptStyleRender == "" {
-		t.Fatalf("PromptStyle render result is empty")
+	view := m.View()
+
+	if !strings.Contains(view, "cache") {
+		t.Fatalf("View() does not contain typed search text \"cache\": %q", view)
+	}
+	if !strings.Contains(view, "Search:") {
+		t.Fatalf("View() does not contain search prompt \"Search:\": %q", view)
+	}
+	lineCount := strings.Count(view, "\n") + 1
+	if lineCount > 24 {
+		t.Fatalf("View() has %d lines, exceeds terminal height 24", lineCount)
 	}
 }
 

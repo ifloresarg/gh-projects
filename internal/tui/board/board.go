@@ -81,8 +81,7 @@ func New(client github.GitHubClient, project github.Project) Model {
 	si := textinput.New()
 	si.Placeholder = "type to filter..."
 	si.Width = 40
-	si.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	si.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	si.Prompt = "Search: "
 
 	return Model{
 		client:          client,
@@ -482,10 +481,7 @@ func (m Model) View() string {
 
 	board := lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
 
-	parts := make([]string, 0, 4)
-	if m.searchMode {
-		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("Search: ")+m.searchInput.View())
-	}
+	parts := make([]string, 0, 5)
 	parts = append(parts, board)
 
 	var statusLine string
@@ -499,7 +495,13 @@ func (m Model) View() string {
 		parts = append(parts, statusLine)
 	}
 
-	if m.searchMode || m.hasActiveFilter() {
+	if m.searchMode {
+		searchLine := m.searchInput.View()
+		if m.searchQuery != "" || m.hasActiveFilter() {
+			searchLine += "  " + lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(fmt.Sprintf("Filter: %d of %d items", m.matchCount(), m.totalItemCount()))
+		}
+		parts = append(parts, searchLine)
+	} else if m.hasActiveFilter() {
 		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(fmt.Sprintf("Filter: %d of %d items", m.matchCount(), m.totalItemCount())))
 	}
 
