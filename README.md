@@ -66,6 +66,7 @@ gh projects
 
 Additional actions (Issue Detail View):
 
+- `u`: Copy issue/PR URL to clipboard
 - `a`: Assign / Unassign users
 - `L`: Add / Remove labels
 - `x` / `X`: Close / Reopen issue

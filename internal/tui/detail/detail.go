@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -534,6 +535,35 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.issueType = newIssueTypeModel(m.client, m.issue, m.width, m.height)
 			m.showIssueType = true
 			return m, m.issueType.Init()
+		case "u":
+			var issueURL string
+			switch m.item.Type {
+			case "Issue":
+				if m.issue != nil {
+					issueURL = fmt.Sprintf("https://github.com/%s/%s/issues/%d", m.issue.RepoOwner, m.issue.RepoName, m.issue.Number)
+				} else if m.item.RepoOwner != "" && m.item.RepoName != "" && m.item.ContentNumber > 0 {
+					issueURL = fmt.Sprintf("https://github.com/%s/%s/issues/%d", m.item.RepoOwner, m.item.RepoName, m.item.ContentNumber)
+				}
+			case "PullRequest":
+				if pr, ok := m.item.Content.(*github.PullRequest); ok && pr != nil {
+					issueURL = pr.URL
+				}
+			default:
+				m.opHint = "Draft items have no URL"
+				return m, nil
+			}
+
+			if issueURL == "" {
+				m.opHint = "URL unavailable"
+				return m, nil
+			}
+
+			if err := clipboard.WriteAll(issueURL); err != nil {
+				m.opMsg = "Error: " + err.Error()
+				return m, nil
+			}
+			m.opMsg = "Copied: " + issueURL
+			return m, nil
 		case "e":
 			if m.showAssign || m.showLabels || m.showComments || m.showIssueType || m.showAddPR || m.showPRPicker {
 				return m, nil
@@ -965,9 +995,9 @@ func (m Model) renderFooterHints() string {
 		Background(lipgloss.Color("236")).
 		Foreground(lipgloss.Color("8"))
 
-	hints := "? Help  c Comments  a Assign  L Labels  p Add PR  x Close  Esc Back"
+	hints := "? Help  u Copy URL  c Comments  a Assign  L Labels  p Add PR  x Close  Esc Back"
 	if m.item.Type == "Issue" {
-		hints = "? Help  c Comments  a Assign  L Labels  t Type  p Add PR  x Close  Esc Back"
+		hints = "? Help  u Copy URL  c Comments  a Assign  L Labels  t Type  p Add PR  x Close  Esc Back"
 	}
 
 	renderedHints := hintStyle.Render(hints)

@@ -89,6 +89,7 @@ func (m Model) View() string {
 		{
 			title: "Detail",
 			items: []string{
+				"  u         Copy URL",
 				"  c         Comments",
 				"  a         Assign / Unassign",
 				"  L         Add / Remove Labels",
