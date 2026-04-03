@@ -828,8 +828,8 @@ func TestSWRRefreshUpdate(t *testing.T) {
 	if updated.state != ViewBoard {
 		t.Fatalf("state = %v, want ViewBoard after refresh update", updated.state)
 	}
-	if updated.loadErr != "Board updated" {
-		t.Fatalf("loadErr = %q, want %q", updated.loadErr, "Board updated")
+	if updated.loadErr != "" {
+		t.Fatalf("loadErr = %q, want empty string", updated.loadErr)
 	}
 	if refreshCmd == nil {
 		t.Fatal("refresh command is nil, want board re-init command")

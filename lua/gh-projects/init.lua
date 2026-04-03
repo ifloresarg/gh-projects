@@ -67,16 +67,25 @@ function M.open_projects(args)
 		end
 	end
 
+	vim.api.nvim_create_autocmd("TermClose", {
+		buffer = buf,
+		once = true,
+		callback = function()
+			if closing then
+				return
+			end
+			closing = true
+			if vim.api.nvim_win_is_valid(win) then
+				pcall(vim.api.nvim_win_close, win, true)
+			end
+		end,
+	})
+
 	-- Open terminal and start the TUI
 	vim.fn.jobstart(cmd, {
 		term = true,
 		on_exit = function()
-			vim.schedule(function()
-				closing = true
-				if vim.api.nvim_win_is_valid(win) then
-					pcall(vim.api.nvim_win_close, win, true)
-				end
-			end)
+			closing = true
 		end,
 	})
 

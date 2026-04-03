@@ -91,8 +91,6 @@ cache_ttl: 300
 
 You can use `gh-projects` inside Neovim as a floating terminal.
 
-**Note:** The Neovim plugin requires the full repository source, not just the binary installed via `gh extension install`. Clone the repo first and point `dir` to your local clone.
-
 ### lazy.nvim example
 
 ```lua

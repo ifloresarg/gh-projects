@@ -312,7 +312,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		a.selectedProject = msg.project
-		a.loadErr = "Board updated"
 		return a, a.board.Init()
 	case picker.ProjectSelectedMsg:
 		// Enforce single-project disk cache: clear stale project data before switching.
