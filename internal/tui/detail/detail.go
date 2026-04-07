@@ -60,6 +60,7 @@ type Model struct {
 	assign        assignModel
 	labels        labelsModel
 	issueType     issueTypeModel
+	title         titleModel
 	comments      commentsModel
 	addPRInput    textinput.Model
 	prPicker      prPickerModel
@@ -70,6 +71,7 @@ type Model struct {
 	showAssign    bool
 	showLabels    bool
 	showIssueType bool
+	showTitle     bool
 	showComments  bool
 	showAddPR     bool
 	showPRPicker  bool
@@ -174,6 +176,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if m.issueType.closing {
 			m.showIssueType = false
 			m.issueType.closing = false
+		}
+		return m, cmd
+	}
+
+	if m.showTitle {
+		var cmd tea.Cmd
+		m.title, cmd = m.title.Update(msg)
+		if m.title.issue != nil && m.issue != nil {
+			m.issue.Title = m.title.issue.Title
+			if issue, ok := m.item.Content.(*github.Issue); ok && issue != nil {
+				issue.Title = m.title.issue.Title
+			}
+			m.item.Title = m.title.issue.Title
+			m.viewport.SetContent(m.renderIssueContent())
+		}
+		if m.title.closing {
+			m.showTitle = false
+			m.title.closing = false
 		}
 		return m, cmd
 	}
@@ -535,6 +555,27 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.issueType = newIssueTypeModel(m.client, m.issue, m.width, m.height)
 			m.showIssueType = true
 			return m, m.issueType.Init()
+		case "T":
+			if m.item.Type != "Issue" {
+				if m.item.Type == "PullRequest" {
+					m.opHint = "PR detail: use GitHub web"
+				} else {
+					m.opHint = "Draft items are read-only"
+				}
+				return m, nil
+			}
+			if m.loading {
+				m.opHint = "Issue still loading"
+				return m, nil
+			}
+			if m.issue == nil {
+				m.opHint = "Issue detail unavailable"
+				return m, nil
+			}
+
+			m.title = newTitleModel(m.client, m.issue, m.width, m.height)
+			m.showTitle = true
+			return m, m.title.Init()
 		case "u":
 			var issueURL string
 			switch m.item.Type {
@@ -565,7 +606,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.opMsg = "Copied: " + issueURL
 			return m, nil
 		case "e":
-			if m.showAssign || m.showLabels || m.showComments || m.showIssueType || m.showAddPR || m.showPRPicker {
+			if m.showAssign || m.showLabels || m.showComments || m.showIssueType || m.showTitle || m.showAddPR || m.showPRPicker {
 				return m, nil
 			}
 			if m.item.Type != "Issue" {
@@ -730,6 +771,10 @@ func (m Model) View() string {
 
 	if m.showIssueType {
 		return m.issueType.View()
+	}
+
+	if m.showTitle {
+		return m.title.View()
 	}
 
 	if m.showComments {
@@ -997,7 +1042,7 @@ func (m Model) renderFooterHints() string {
 
 	hints := "? Help  u Copy URL  c Comments  a Assign  L Labels  p Add PR  x Close  Esc Back"
 	if m.item.Type == "Issue" {
-		hints = "? Help  u Copy URL  c Comments  a Assign  L Labels  t Type  p Add PR  x Close  Esc Back"
+		hints = "? Help  u Copy URL  c Comments  a Assign  L Labels  t Type  T Title  p Add PR  x Close  Esc Back"
 	}
 
 	renderedHints := hintStyle.Render(hints)
@@ -1049,6 +1094,9 @@ func (m *Model) syncSize(msg tea.WindowSizeMsg) {
 	m.labels.height = msg.Height
 	m.issueType.width = msg.Width
 	m.issueType.height = msg.Height
+	m.title.width = msg.Width
+	m.title.height = msg.Height
+	m.title.textinput.Width = max(msg.Width-8, 20)
 	m.comments.width = msg.Width
 	m.comments.height = msg.Height
 	m.comments.syncSize()

@@ -341,6 +341,14 @@ func (c *CachedClient) UpdateIssueType(issueID string, typeID *string) error {
 	return nil
 }
 
+func (c *CachedClient) UpdateIssueTitle(issueID string, title string) error {
+	if err := c.inner.UpdateIssueTitle(issueID, title); err != nil {
+		return err
+	}
+	c.InvalidateAll()
+	return nil
+}
+
 func (c *CachedClient) UpdateIssueBody(issueID string, body string) error {
 	if err := c.inner.UpdateIssueBody(issueID, body); err != nil {
 		return err

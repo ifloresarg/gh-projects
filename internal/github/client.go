@@ -24,6 +24,7 @@ type GitHubClient interface {
 	UnassignUser(owner, repo string, number int, login string) error
 	AddLabel(owner, repo string, number int, labelName string) error
 	RemoveLabel(owner, repo string, number int, labelID string) error
+	UpdateIssueTitle(issueID string, title string) error
 	UpdateIssueType(issueID string, typeID *string) error
 	UpdateIssueBody(issueID string, body string) error
 	CloseIssue(owner, repo string, number int) error

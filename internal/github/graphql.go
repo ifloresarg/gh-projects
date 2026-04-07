@@ -1188,6 +1188,30 @@ func (g *GraphQLClient) UpdateIssueType(issueID string, typeID *string) error {
 	return nil
 }
 
+func (g *GraphQLClient) UpdateIssueTitle(issueID string, title string) error {
+	var mutation struct {
+		UpdateIssue struct {
+			Issue struct{ ID string }
+		} `graphql:"updateIssue(input: $input)"`
+	}
+
+	type UpdateIssueInput struct {
+		IssueID graphql.ID     `json:"id"`
+		Title   graphql.String `json:"title"`
+	}
+
+	input := UpdateIssueInput{
+		IssueID: graphql.ID(issueID),
+		Title:   graphql.String(title),
+	}
+
+	if err := g.client.Mutate("UpdateIssueTitle", &mutation, map[string]interface{}{"input": input}); err != nil {
+		return fmt.Errorf("update issue title %s: %w", issueID, err)
+	}
+
+	return nil
+}
+
 func (g *GraphQLClient) UpdateIssueBody(issueID string, body string) error {
 	var mutation struct {
 		UpdateIssue struct {
