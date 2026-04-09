@@ -371,6 +371,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch {
 		case msg.String() == "q":
+			if (a.state == ViewDetail && a.detail.IsInputFocused()) ||
+				(a.state == ViewBoard && a.board.IsSearching()) {
+				break
+			}
 			return a, tea.Quit
 		case key.Matches(msg, a.keys.Help):
 			a.help.Show()

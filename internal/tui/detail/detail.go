@@ -108,6 +108,10 @@ func (m Model) UpdatedItem() github.ProjectItem {
 	return m.item
 }
 
+func (m Model) IsInputFocused() bool {
+	return m.showComments || m.showAddPR || m.showTitle || m.showAssign || m.showLabels || m.showIssueType || m.showPRPicker
+}
+
 func (m Model) Init() tea.Cmd {
 	if m.item.Type != "Issue" {
 		return nil

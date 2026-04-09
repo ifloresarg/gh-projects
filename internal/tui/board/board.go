@@ -867,6 +867,10 @@ func (m Model) IsShowingSettings() bool {
 	return m.showSettings
 }
 
+func (m Model) IsSearching() bool {
+	return m.searchMode
+}
+
 func (m *Model) ClearSelection() {
 	m.selected = false
 }
