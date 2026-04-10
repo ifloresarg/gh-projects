@@ -137,3 +137,58 @@ func TestLinkPRToIssueAppendsClosingKeyword(t *testing.T) {
 		})
 	}
 }
+
+func TestLinkPRToIssueSkipsDuplicate(t *testing.T) {
+	t.Parallel()
+
+	existingBody := "Fix rendering.\n\nCloses octocat/gh-projects#34"
+
+	apiClient, err := api.NewGraphQLClient(api.ClientOptions{
+		Host:      "github.com",
+		AuthToken: "token",
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				t.Fatalf("ReadAll(request body) error = %v", err)
+			}
+
+			requestBody := string(body)
+
+			if strings.Contains(requestBody, "GetPullRequest") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body: io.NopCloser(strings.NewReader(`{
+						"data": {
+							"repository": {
+								"owner": {"login": "octocat"},
+								"name": "gh-projects",
+								"pullRequest": {
+									"id": "PR_1",
+									"number": 12,
+									"title": "Link issue",
+									"url": "https://github.com/octocat/gh-projects/pull/12",
+									"body": ` + strconvQuoteJSON(existingBody) + `,
+									"state": "OPEN"
+								}
+							}
+						}
+					}`)),
+					Request: req,
+				}, nil
+			}
+
+			t.Fatalf("unexpected mutation call when closing ref already exists: %s", requestBody)
+			return nil, nil
+		}),
+	})
+	if err != nil {
+		t.Fatalf("api.NewGraphQLClient() error = %v", err)
+	}
+
+	client := &GraphQLClient{client: apiClient}
+
+	if err := client.LinkPRToIssue("octocat", "gh-projects", 12, 34); err != nil {
+		t.Fatalf("LinkPRToIssue() error = %v", err)
+	}
+}

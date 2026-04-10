@@ -987,7 +987,12 @@ func (g *GraphQLClient) LinkPRToIssue(owner, repo string, prNumber, issueNumber 
 		return err
 	}
 
-	newBody := pr.Body + fmt.Sprintf("\n\nCloses %s/%s#%d", owner, repo, issueNumber)
+	closingRef := fmt.Sprintf("Closes %s/%s#%d", owner, repo, issueNumber)
+	if strings.Contains(pr.Body, closingRef) {
+		return nil
+	}
+
+	newBody := pr.Body + "\n\n" + closingRef
 
 	var mutation struct {
 		UpdatePullRequest struct {
